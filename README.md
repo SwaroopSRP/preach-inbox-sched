@@ -41,6 +41,7 @@ A production-minded, minimalistic TypeScript backend for scheduling, throttling,
 - [x] Database schema & Prisma setup
 - [x] Redis & BullMQ delayed queue
 - [x] Email scheduling APIs
+- [x] Ethereal SMTP delivery & worker
 
 ---
 
