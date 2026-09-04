@@ -8,6 +8,7 @@ import { emailRoutes } from './modules/emails/email.routes.js';
 import { senderRoutes } from './modules/senders/sender.routes.js';
 import { slackRoutes } from './modules/slack/slack.routes.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
+import { setupBullBoard } from './queue/bullboard.js';
 import { registerRateLimitNotifier } from './workers/email.worker.js';
 import { notifySlackOnRateLimit } from './modules/slack/slack.service.js';
 
@@ -43,6 +44,9 @@ export function createApp(): Express {
   app.use('/api/emails', emailRoutes);
   app.use('/api/senders', senderRoutes);
   app.use('/api/integrations/slack', slackRoutes);
+
+  // Bull Board Queue Dashboard
+  app.use('/admin/queues', setupBullBoard());
 
   // Centralized error handling
   app.use(errorHandler);

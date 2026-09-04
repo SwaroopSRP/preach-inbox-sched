@@ -47,7 +47,21 @@ A production-minded, minimalistic TypeScript backend for scheduling, throttling,
 - [x] Slack OAuth & rate limit notifications
 - [x] Google OAuth & authentication
 - [x] Elasticsearch projection & search
-- [ ] Bull Board queue dashboard
+- [x] Bull Board queue dashboard
+- [ ] Automated tests & verification
+
+---
+
+## Bull Board Queue Dashboard
+
+The live BullMQ queue dashboard is mounted at:
+```text
+http://localhost:3000/admin/queues
+```
+Features available in the dashboard:
+- Real-time job counts: **Waiting**, **Delayed**, **Active**, **Completed**, and **Failed**.
+- Detailed job inspection: payload data (`emailId`), calculated execution delays, failure backtraces, and timestamps.
+- Manual retry / promote controls for evaluator inspection.
 
 ---
 
