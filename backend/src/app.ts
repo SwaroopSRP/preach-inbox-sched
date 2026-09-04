@@ -4,6 +4,9 @@ import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
 import { errorHandler } from './middleware/error.middleware.js';
 
+import { emailRoutes } from './modules/emails/email.routes.js';
+import { senderRoutes } from './modules/senders/sender.routes.js';
+
 export function createApp(): Express {
   const app = express();
 
@@ -26,6 +29,13 @@ export function createApp(): Express {
       uptime: process.uptime(),
     });
   });
+
+  // Feature routes
+  app.use('/api/emails', emailRoutes);
+  app.use('/api/senders', senderRoutes);
+
+  // Centralized error handling
+  app.use(errorHandler);
 
   return app;
 }
