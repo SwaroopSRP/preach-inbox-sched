@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { prisma } from '../src/lib/prisma.js';
 import { processEmailJob } from '../src/workers/email.worker.js';
 import * as mailerService from '../src/integrations/mailer/mailer.service.js';
+import * as rateLimiter from '../src/workers/rate-limiter.js';
 import { Job } from 'bullmq';
 
 describe('Idempotency & Duplicate Prevention Guard', () => {
@@ -41,6 +42,9 @@ describe('Idempotency & Duplicate Prevention Guard', () => {
   });
 
   it('guarantees only one worker can process an email when invoked concurrently', async () => {
+    // Both concurrent invocations pass rate limiter so they test the database atomic lock
+    vi.spyOn(rateLimiter, 'checkRateLimits').mockResolvedValue({ allowed: true });
+
     const sendMailSpy = vi.spyOn(mailerService, 'sendEmail').mockImplementation(async () => {
       // Simulate slight network delay
       await new Promise((resolve) => setTimeout(resolve, 50));

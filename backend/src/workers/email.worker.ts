@@ -72,19 +72,12 @@ export async function processEmailJob(job: Job<EmailJobData>, token?: string) {
       );
     }
 
-    // Move job back to delayed state in BullMQ
-    if (token) {
-      await job.moveToDelayed(Date.now() + delayMs, token);
-    } else {
-      // In standalone tests where token is not provided by worker runner:
+    // Move job back to delayed state in BullMQ if running inside active worker with token
+    if (token && typeof job.moveToDelayed === 'function') {
       try {
-        await job.moveToDelayed(Date.now() + delayMs, '0');
-      } catch {
-        // Fallback: re-enqueue with delay
-        await emailQueue.add(job.name, job.data, {
-          jobId: `${emailId}-retry-${Date.now()}`,
-          delay: delayMs,
-        });
+        await job.moveToDelayed(Date.now() + delayMs, token);
+      } catch (err) {
+        logger.debug(`Could not moveToDelayed with token: ${err}`);
       }
     }
 

@@ -10,10 +10,10 @@ local minDelay = tonumber(ARGV[2])
 local nextAvailable = tonumber(redis.call('GET', key) or "0")
 if nextAvailable > now then
   local waitMs = nextAvailable - now
-  redis.call('SET', key, nextAvailable + minDelay, 'PX', 120000)
-  return { 0, waitMs }
+  redis.call('SET', key, tostring(math.floor(nextAvailable + minDelay)), 'PX', 120000)
+  return { 0, math.floor(waitMs) }
 else
-  redis.call('SET', key, now + minDelay, 'PX', 120000)
+  redis.call('SET', key, tostring(math.floor(now + minDelay)), 'PX', 120000)
   return { 1, 0 }
 end
 `;

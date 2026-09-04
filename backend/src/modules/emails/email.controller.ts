@@ -39,7 +39,7 @@ export async function getSentEmailsHandler(req: Request, res: Response, next: Ne
 export async function getEmailByIdHandler(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = req.user?.id as string;
-    const emailId = req.params.id;
+    const emailId = req.params.id as string;
     const email = await emailService.getEmailById(emailId, userId);
     res.json({ email });
   } catch (err) {

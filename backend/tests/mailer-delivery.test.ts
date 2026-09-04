@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi, beforeEach } from 'vitest';
 import { prisma } from '../src/lib/prisma.js';
 import { processEmailJob } from '../src/workers/email.worker.js';
 import * as mailerService from '../src/integrations/mailer/mailer.service.js';
+import * as rateLimiter from '../src/workers/rate-limiter.js';
 import { Job } from 'bullmq';
 
 describe('Email Delivery & Worker State Machine', () => {
@@ -34,6 +35,10 @@ describe('Email Delivery & Worker State Machine', () => {
       },
     });
     testSenderId = sender.id;
+  });
+
+  beforeEach(() => {
+    vi.spyOn(rateLimiter, 'checkRateLimits').mockResolvedValue({ allowed: true });
   });
 
   afterAll(async () => {
