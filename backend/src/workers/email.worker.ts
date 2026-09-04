@@ -1,14 +1,23 @@
 import { Worker, Job } from 'bullmq';
-import { EMAIL_QUEUE_NAME, EmailJobData } from '../queue/email.queue.js';
+import { EMAIL_QUEUE_NAME, EmailJobData, emailQueue } from '../queue/email.queue.js';
 import { createRedisConnection } from '../lib/redis.js';
 import { prisma } from '../lib/prisma.js';
 import { sendEmail } from '../integrations/mailer/mailer.service.js';
+import { checkRateLimits } from './rate-limiter.js';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 
 const workerRedisConnection = createRedisConnection('worker');
 
-export async function processEmailJob(job: Job<EmailJobData>) {
+// Optional hook for Slack notifications on rate-limit hit (wired in Phase 8)
+export type RateLimitNotifyFn = (userId: string, senderEmail: string, maxHourly: number) => Promise<void>;
+let rateLimitNotifier: RateLimitNotifyFn | null = null;
+
+export function registerRateLimitNotifier(fn: RateLimitNotifyFn) {
+  rateLimitNotifier = fn;
+}
+
+export async function processEmailJob(job: Job<EmailJobData>, token?: string) {
   const { emailId } = job.data;
   logger.info(`Worker picked up email job [${job.id}] for email ${emailId}`);
 
@@ -23,8 +32,65 @@ export async function processEmailJob(job: Job<EmailJobData>) {
     return;
   }
 
-  // 2. Atomic state transition: only proceed if status is SCHEDULED
-  // If already SENT or PROCESSING, skip to guarantee idempotency
+  // Idempotency guard: only proceed if status is SCHEDULED
+  if (email.status !== 'SCHEDULED') {
+    logger.warn(`Email ${emailId} is in status '${email.status}'. Skipping duplicate execution.`);
+    return;
+  }
+
+  // 2. Check Hourly Rate Limit & Inter-Email Minimum Delay Throttling
+  const limitCheck = await checkRateLimits(email.senderId);
+
+  if (!limitCheck.allowed) {
+    const delayMs = limitCheck.rescheduleDelayMs ?? 5000;
+
+    if (limitCheck.reason === 'HOURLY_LIMIT_EXCEEDED') {
+      logger.warn(
+        `Sender ${email.sender.email} reached hourly limit. Rescheduling email ${emailId} for next window in ${Math.round(delayMs / 1000)}s`
+      );
+
+      // Update scheduledAt in DB to reflect the new window
+      await prisma.email.update({
+        where: { id: emailId },
+        data: {
+          scheduledAt: new Date(Date.now() + delayMs),
+        },
+      });
+
+      // Trigger Slack notification if listener is registered
+      if (rateLimitNotifier) {
+        try {
+          await rateLimitNotifier(email.userId, email.sender.email, env.MAX_EMAILS_PER_HOUR_PER_SENDER);
+        } catch (err) {
+          logger.error(`Failed to send rate-limit Slack notification: ${err instanceof Error ? err.message : err}`);
+        }
+      }
+    } else {
+      logger.info(
+        `Spacing throttle enforced for sender ${email.sender.email}. Delaying email ${emailId} by ${delayMs}ms`
+      );
+    }
+
+    // Move job back to delayed state in BullMQ
+    if (token) {
+      await job.moveToDelayed(Date.now() + delayMs, token);
+    } else {
+      // In standalone tests where token is not provided by worker runner:
+      try {
+        await job.moveToDelayed(Date.now() + delayMs, '0');
+      } catch {
+        // Fallback: re-enqueue with delay
+        await emailQueue.add(job.name, job.data, {
+          jobId: `${emailId}-retry-${Date.now()}`,
+          delay: delayMs,
+        });
+      }
+    }
+
+    return;
+  }
+
+  // 3. Atomic state transition: SCHEDULED -> PROCESSING
   const updateResult = await prisma.email.updateMany({
     where: {
       id: emailId,
@@ -36,12 +102,12 @@ export async function processEmailJob(job: Job<EmailJobData>) {
   });
 
   if (updateResult.count === 0) {
-    logger.warn(`Email ${emailId} is already in state '${email.status}'. Idempotency guard skipped execution.`);
+    logger.warn(`Email ${emailId} concurrent transition lost. Skipping.`);
     return;
   }
 
   try {
-    // 3. Send email via Nodemailer Ethereal SMTP
+    // 4. Send email via Nodemailer Ethereal SMTP
     const deliveryResult = await sendEmail({
       fromName: email.sender.name,
       fromEmail: email.sender.email,
@@ -50,7 +116,7 @@ export async function processEmailJob(job: Job<EmailJobData>) {
       body: email.body,
     });
 
-    // 4. Mark email as SENT
+    // 5. Mark email as SENT
     await prisma.email.update({
       where: { id: emailId },
       data: {
@@ -68,7 +134,6 @@ export async function processEmailJob(job: Job<EmailJobData>) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown SMTP delivery failure';
     logger.error(`Failed to send email ${emailId}: ${errorMsg}`);
 
-    // Mark as FAILED if this is the final attempt or non-retryable
     const isFinalAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 3);
     if (isFinalAttempt) {
       await prisma.email.update({
@@ -86,7 +151,7 @@ export async function processEmailJob(job: Job<EmailJobData>) {
 }
 
 export function createEmailWorker(
-  processor?: (job: Job<EmailJobData>) => Promise<void>
+  processor?: (job: Job<EmailJobData>, token?: string) => Promise<void>
 ) {
   const worker = new Worker<EmailJobData>(
     EMAIL_QUEUE_NAME,

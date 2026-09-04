@@ -43,7 +43,32 @@ A production-minded, minimalistic TypeScript backend for scheduling, throttling,
 - [x] Email scheduling APIs
 - [x] Ethereal SMTP delivery & worker
 - [x] Idempotency & duplicate prevention
-- [ ] Rate limiting, throttling & rescheduling
+- [x] Rate limiting, throttling & rescheduling
+- [ ] Slack OAuth & rate limit notifications
+
+---
+
+## Rate Limiting, Throttling & Rescheduling Engine
+
+### 1. Atomic Inter-Email Delay Throttling (`MIN_EMAIL_DELAY_MS`)
+To prevent concurrent workers from firing emails simultaneously:
+- An atomic Lua script evaluates `email-delay:{senderId}` in Redis.
+- Rather than putting `await sleep(...)` in worker threads (which blocks threads and pins database connections), each worker atomically reserves the next available dispatch slot.
+- If a slot is within `MIN_EMAIL_DELAY_MS` of a previous send, the Lua script computes the exact delta `waitMs` and advances the reservation.
+- The worker moves the job to BullMQ delayed status for `waitMs`.
+- When 1,000+ emails arrive simultaneously, they automatically sequence into spaced delayed jobs (e.g. 0s, 2s, 4s, 6s...) without worker deadlocks.
+
+### 2. Atomic Hourly Rate Limiting (`MAX_EMAILS_PER_HOUR_PER_SENDER`)
+- Hourly sending quota is tracked per sender using Redis keys: `email-rate:{senderId}:{YYYY-MM-DD-HH}` with a 2-hour TTL.
+- An atomic Lua script inspects the counter:
+  - If `count < MAX_HOURLY`: increments counter and grants immediate delivery permission.
+  - If `count >= MAX_HOURLY`: delivery is denied.
+
+### 3. Zero-Drop Rescheduling Strategy
+- When an email is rate-limited, it is **never dropped** and **never marked as FAILED**.
+- The system calculates the exact milliseconds remaining until the top of the next UTC hour window (`getMillisUntilNextHour()`).
+- The database record's `scheduledAt` is updated to the start of the next hour window.
+- The BullMQ job is moved to delayed status (`job.moveToDelayed(Date.now() + delayMs, token)`), preserving job data and FIFO order.
 
 ---
 
