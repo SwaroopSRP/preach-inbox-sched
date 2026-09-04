@@ -44,7 +44,27 @@ A production-minded, minimalistic TypeScript backend for scheduling, throttling,
 - [x] Ethereal SMTP delivery & worker
 - [x] Idempotency & duplicate prevention
 - [x] Rate limiting, throttling & rescheduling
-- [ ] Slack OAuth & rate limit notifications
+- [x] Slack OAuth & rate limit notifications
+- [ ] Google OAuth & authentication
+
+---
+
+## Slack OAuth & Rate-Limit Notifications
+
+The system includes real Slack OAuth 2.0 integration:
+1. **OAuth Flow**:
+   - `GET /api/integrations/slack/connect`: Generates the Slack OAuth URL with `chat:write` and `incoming-webhook` scopes.
+   - `GET /api/integrations/slack/callback`: Exchanges authorization code with Slack's `oauth.v2.access` endpoint and persists credentials in the `SlackConnection` table.
+   - `GET /api/integrations/slack/status`: Returns current connection status (`connected: true/false`, team, channel).
+   - `POST /api/integrations/slack/disconnect`: Revokes and deletes connection from PostgreSQL.
+2. **Notification Dispatch**:
+   - Triggered automatically by the worker when a sender hits their hourly limit.
+   - Message format: `⚠️ PreachInbox Alert: Sender <email> reached its hourly email limit of <max>. Remaining scheduled emails will automatically continue in the next available window.`
+3. **Window-Level Deduplication**:
+   - Notifications are deduplicated per sender per hour window using an atomic Redis key (`slack-alerted:email-rate:{senderId}:{window}`) with a 3600s TTL. Even if 1,000 emails hit the rate limit in the same hour, only **one** alert is sent to Slack.
+4. **Graceful Disconnect Resilience**:
+   - If a user has not connected Slack or disconnects, the system continues processing and rescheduling without throwing unhandled errors or crashing.
+   - Connecting Slack later immediately activates notifications for future rate-limit events without service restarts.
 
 ---
 

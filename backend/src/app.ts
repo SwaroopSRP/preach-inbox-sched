@@ -6,6 +6,12 @@ import { errorHandler } from './middleware/error.middleware.js';
 
 import { emailRoutes } from './modules/emails/email.routes.js';
 import { senderRoutes } from './modules/senders/sender.routes.js';
+import { slackRoutes } from './modules/slack/slack.routes.js';
+import { registerRateLimitNotifier } from './workers/email.worker.js';
+import { notifySlackOnRateLimit } from './modules/slack/slack.service.js';
+
+// Register Slack rate-limit notifier hook
+registerRateLimitNotifier(notifySlackOnRateLimit);
 
 export function createApp(): Express {
   const app = express();
@@ -33,6 +39,7 @@ export function createApp(): Express {
   // Feature routes
   app.use('/api/emails', emailRoutes);
   app.use('/api/senders', senderRoutes);
+  app.use('/api/integrations/slack', slackRoutes);
 
   // Centralized error handling
   app.use(errorHandler);
