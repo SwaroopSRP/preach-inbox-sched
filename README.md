@@ -45,7 +45,27 @@ A production-minded, minimalistic TypeScript backend for scheduling, throttling,
 - [x] Idempotency & duplicate prevention
 - [x] Rate limiting, throttling & rescheduling
 - [x] Slack OAuth & rate limit notifications
-- [ ] Google OAuth & authentication
+- [x] Google OAuth & authentication
+- [ ] Elasticsearch projection & search
+
+---
+
+## Authentication Flow (Google OAuth & JWT)
+
+The authentication system is built for seamless browser and API usage:
+1. **Login**:
+   - The user or frontend navigates to `GET /auth/google` (or `/api/auth/google`).
+   - The server generates the OAuth 2.0 consent URL requesting `profile` and `email` scopes.
+2. **Callback & Provisioning**:
+   - Google redirects to `GET /api/auth/google/callback?code=...`.
+   - The backend exchanges the authorization code for tokens, retrieves Google profile info (`googleId`, `email`, `name`, `avatar`), and upserts the `User` in PostgreSQL.
+   - Automatically provisions a default `Sender` identity using the user's primary email.
+   - Issues a signed JWT (valid 7 days) and sets it in an HTTP-only, `SameSite=Lax` cookie named `token`.
+   - Redirects the browser to `${FRONTEND_URL}/dashboard`.
+3. **Current User Profile**:
+   - `GET /api/auth/me` verifies either the HTTP-only cookie or the `Authorization: Bearer <token>` header, returning the authenticated user.
+4. **Logout**:
+   - `POST /api/auth/logout` clears the authentication cookie.
 
 ---
 
