@@ -46,7 +46,29 @@ A production-minded, minimalistic TypeScript backend for scheduling, throttling,
 - [x] Rate limiting, throttling & rescheduling
 - [x] Slack OAuth & rate limit notifications
 - [x] Google OAuth & authentication
-- [ ] Elasticsearch projection & search
+- [x] Elasticsearch projection & search
+- [ ] Bull Board queue dashboard
+
+---
+
+## Elasticsearch Searchable Projection
+
+PostgreSQL is the source of truth for all business and relational transactions. Elasticsearch acts purely as an indexing and query projection for high-speed free-text search:
+1. **Indexed Fields**:
+   - `id` (keyword)
+   - `userId` (keyword, for strict multi-tenant isolation)
+   - `senderId` (keyword)
+   - `status` (keyword)
+   - `scheduledAt` (date)
+   - `sentAt` (date)
+   - `recipient` (text + keyword)
+   - `subject` (text, weighted `^2` in search)
+   - `body` (text)
+2. **Search API**:
+   - `GET /api/emails/search?q=<term>`: Performs a `multi_match` query across recipient, subject, and body with automatic fuzziness, strictly filtered by the authenticated user's `userId`.
+3. **Resilience & Circuit Breaker**:
+   - Document indexing and status updates run asynchronously and tolerate offline Elasticsearch instances without failing primary email transactions.
+   - A built-in circuit breaker catches connectivity failures. When Elasticsearch is offline or unreachable, search queries automatically fall back to an internal PostgreSQL relational `ILIKE` search (`source: 'postgres_fallback'`), ensuring zero downtime for the frontend user.
 
 ---
 

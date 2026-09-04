@@ -4,6 +4,7 @@ import { createRedisConnection } from '../lib/redis.js';
 import { prisma } from '../lib/prisma.js';
 import { sendEmail } from '../integrations/mailer/mailer.service.js';
 import { checkRateLimits } from './rate-limiter.js';
+import { updateEmailDocument } from '../lib/elasticsearch.js';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 
@@ -117,14 +118,21 @@ export async function processEmailJob(job: Job<EmailJobData>, token?: string) {
     });
 
     // 5. Mark email as SENT
+    const sentDate = new Date();
     await prisma.email.update({
       where: { id: emailId },
       data: {
         status: 'SENT',
-        sentAt: new Date(),
+        sentAt: sentDate,
         errorMessage: null,
       },
     });
+
+    // Update Elasticsearch projection
+    updateEmailDocument(emailId, {
+      status: 'SENT',
+      sentAt: sentDate.toISOString(),
+    }).catch(() => {});
 
     logger.info(`Email ${emailId} successfully sent to ${email.recipient}`, {
       messageId: deliveryResult.messageId,
@@ -136,14 +144,19 @@ export async function processEmailJob(job: Job<EmailJobData>, token?: string) {
 
     const isFinalAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 3);
     if (isFinalAttempt) {
+      const failedDate = new Date();
       await prisma.email.update({
         where: { id: emailId },
         data: {
           status: 'FAILED',
-          failedAt: new Date(),
+          failedAt: failedDate,
           errorMessage: errorMsg,
         },
       });
+
+      updateEmailDocument(emailId, {
+        status: 'FAILED',
+      }).catch(() => {});
     }
 
     throw error;

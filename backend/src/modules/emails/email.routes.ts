@@ -9,4 +9,5 @@ emailRoutes.use(requireAuth);
 emailRoutes.post('/schedule', emailController.scheduleEmailHandler);
 emailRoutes.get('/scheduled', emailController.getScheduledEmailsHandler);
 emailRoutes.get('/sent', emailController.getSentEmailsHandler);
+emailRoutes.get('/search', emailController.searchEmailsHandler);
 emailRoutes.get('/:id', emailController.getEmailByIdHandler);

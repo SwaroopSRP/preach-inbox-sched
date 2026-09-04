@@ -46,3 +46,14 @@ export async function getEmailByIdHandler(req: Request, res: Response, next: Nex
     next(err);
   }
 }
+
+export async function searchEmailsHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = req.user?.id as string;
+    const query = (req.query.q as string) || '';
+    const results = await emailService.searchEmails(userId, query);
+    res.json(results);
+  } catch (err) {
+    next(err);
+  }
+}

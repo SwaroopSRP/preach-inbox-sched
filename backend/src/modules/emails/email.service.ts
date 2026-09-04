@@ -4,6 +4,7 @@ import { ScheduleEmailInput } from './email.schema.js';
 import { AppError } from '../../middleware/error.middleware.js';
 import { env } from '../../config/env.js';
 import { logger } from '../../lib/logger.js';
+import { indexEmailDocument, searchEmails as esSearch } from '../../lib/elasticsearch.js';
 
 export async function scheduleEmails(userId: string, input: ScheduleEmailInput) {
   // 1. Verify sender exists and belongs to user
@@ -26,7 +27,7 @@ export async function scheduleEmails(userId: string, input: ScheduleEmailInput) 
 
   const createdEmails = [];
 
-  // 3. Persist each recipient email record and enqueue in BullMQ
+  // 3. Persist each recipient email record, enqueue in BullMQ, and index in Elasticsearch projection
   for (let i = 0; i < input.recipients.length; i++) {
     const recipient = input.recipients[i];
     const jobDelay = baseDelayMs + i * effectiveDelayMs;
@@ -46,6 +47,20 @@ export async function scheduleEmails(userId: string, input: ScheduleEmailInput) 
 
     // Enqueue BullMQ delayed job with deterministic jobId = email.id
     await enqueueEmailJob(email.id, jobDelay);
+
+    // Asynchronously project into Elasticsearch (non-blocking, failure-tolerant)
+    indexEmailDocument({
+      id: email.id,
+      userId: email.userId,
+      senderId: email.senderId,
+      recipient: email.recipient,
+      subject: email.subject,
+      body: email.body,
+      status: email.status,
+      scheduledAt: email.scheduledAt.toISOString(),
+      sentAt: null,
+    }).catch(() => {});
+
     createdEmails.push(email);
   }
 
@@ -101,4 +116,39 @@ export async function getEmailById(emailId: string, userId: string) {
   }
 
   return email;
+}
+
+export async function searchEmails(userId: string, query: string) {
+  try {
+    const esHits = await esSearch(userId, query);
+    return {
+      source: 'elasticsearch',
+      count: esHits.length,
+      emails: esHits,
+    };
+  } catch (err) {
+    logger.warn('Falling back to PostgreSQL relational search because Elasticsearch query failed');
+    const emails = await prisma.email.findMany({
+      where: {
+        userId,
+        OR: [
+          { recipient: { contains: query, mode: 'insensitive' } },
+          { subject: { contains: query, mode: 'insensitive' } },
+          { body: { contains: query, mode: 'insensitive' } },
+        ],
+      },
+      include: {
+        sender: {
+          select: { id: true, email: true, name: true },
+        },
+      },
+      orderBy: { scheduledAt: 'desc' },
+    });
+
+    return {
+      source: 'postgres_fallback',
+      count: emails.length,
+      emails,
+    };
+  }
 }
