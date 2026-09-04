@@ -38,7 +38,7 @@ A production-minded, minimalistic TypeScript backend for scheduling, throttling,
 ## Project Status & Milestones
 
 - [x] Base project setup (TypeScript, Express, Zod env validation, error handling)
-- [ ] Database schema & Prisma setup
+- [x] Database schema & Prisma setup
 - [ ] Redis & BullMQ delayed queue
 - [ ] Email scheduling APIs
 - [ ] Ethereal SMTP delivery & worker
