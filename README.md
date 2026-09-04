@@ -42,8 +42,29 @@ A production-minded, minimalistic TypeScript backend for scheduling, throttling,
 - [x] Redis & BullMQ delayed queue
 - [x] Email scheduling APIs
 - [x] Ethereal SMTP delivery & worker
+- [x] Idempotency & duplicate prevention
+- [ ] Rate limiting, throttling & rescheduling
 
 ---
+
+## Idempotency & Reliability Model
+
+### 1. Deterministic Job Deduplication
+Every scheduled email is enqueued with `jobId: email.id`. If an enqueue operation is retried or repeated, BullMQ refuses to create a duplicate job with the same ID in the queue.
+
+### 2. Atomic Database State Transitions
+Before initiating external network calls (SMTP delivery), the worker executes an atomic conditional update on PostgreSQL:
+```sql
+UPDATE "Email" SET "status" = 'PROCESSING' WHERE "id" = :emailId AND "status" = 'SCHEDULED';
+```
+If multiple workers concurrently receive the same job ID or retry, only one worker transitions the row (`count === 1`). The other workers encounter `count === 0` and safely exit immediately without delivering duplicate emails.
+
+### 3. Dual-Write Boundary Limitations (Honest Assessment)
+External SMTP delivery via TCP/TLS cannot participate in a 2-Phase Commit (2PC) or distributed transaction with PostgreSQL.
+If a worker delivers an email to the SMTP server and immediately suffers a hard SIGKILL/kernel crash before the subsequent `status = SENT` database write completes:
+- The email was delivered to the recipient.
+- On worker recovery, the job may retry if unacknowledged.
+While this crash window is on the order of milliseconds, it represents an inherent physical property of non-transactional external APIs. The combination of deterministic `jobId`, atomic DB transitions, and conditional status checks eliminates duplicate application scheduling and race conditions across concurrent workers.
 
 ## Restart Persistence Architecture
 
