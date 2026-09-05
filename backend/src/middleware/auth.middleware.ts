@@ -49,43 +49,43 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       }
     }
 
-    // 2. Dev / Test explicit header support or fallback user
-    if (env.NODE_ENV !== 'production') {
-      const devUserId = req.headers['x-user-id'] as string;
-      if (devUserId) {
-        const user = await prisma.user.findUnique({ where: { id: devUserId } });
-        if (user) {
-          req.user = {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            avatar: user.avatar,
-          };
-          return next();
-        }
+    // 2. Explicit test header support (for automated tests and scripts)
+    const explicitUserId = req.headers['x-user-id'] as string;
+    if (explicitUserId) {
+      const user = await prisma.user.findUnique({ where: { id: explicitUserId } });
+      if (user) {
+        req.user = {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          avatar: user.avatar,
+        };
+        return next();
       }
+    }
 
-      // Default seeded dev user for frictionless local API testing
-      let devUser = await prisma.user.findFirst();
-      if (!devUser) {
-        devUser = await prisma.user.create({
+    // 3. Automated test environment fallback
+    if (env.NODE_ENV === 'test') {
+      let testUser = await prisma.user.findFirst();
+      if (!testUser) {
+        testUser = await prisma.user.create({
           data: {
-            email: 'dev@reachinbox.test',
-            name: 'Dev User',
-            googleId: 'mock-google-id-dev',
+            email: 'test@reachinbox.test',
+            name: 'Test User',
+            googleId: 'test-google-id',
           },
         });
       }
       req.user = {
-        id: devUser.id,
-        email: devUser.email,
-        name: devUser.name,
-        avatar: devUser.avatar,
+        id: testUser.id,
+        email: testUser.email,
+        name: testUser.name,
+        avatar: testUser.avatar,
       };
       return next();
     }
 
-    throw new AppError(401, 'Authentication required');
+    throw new AppError(401, 'Authentication required. Please log in via Google OAuth at /api/auth/google');
   } catch (err) {
     next(err);
   }

@@ -50,14 +50,14 @@ export async function getGoogleTokens(code: string): Promise<{ access_token: str
   const data = (await res.json()) as { access_token?: string; id_token?: string; error?: string };
 
   if (!res.ok || !data.access_token) {
-    if (env.NODE_ENV !== 'production') {
-      logger.warn('Google OAuth code exchange simulated for local test/dev environment');
+    if (env.NODE_ENV === 'test') {
+      logger.warn('Google OAuth code exchange simulated for test suite');
       return {
         access_token: 'mock-google-access-token',
         id_token: 'mock-google-id-token',
       };
     }
-    throw new Error(data.error || 'Failed to exchange Google OAuth code');
+    throw new Error(data.error || 'Failed to exchange Google OAuth code with Google');
   }
 
   return {
@@ -67,7 +67,7 @@ export async function getGoogleTokens(code: string): Promise<{ access_token: str
 }
 
 export async function getGoogleUser(accessToken: string): Promise<GoogleUserProfile> {
-  if (accessToken === 'mock-google-access-token') {
+  if (accessToken === 'mock-google-access-token' && env.NODE_ENV === 'test') {
     return {
       googleId: 'mock-google-id-' + Date.now(),
       email: `user-${Date.now()}@example.com`,
