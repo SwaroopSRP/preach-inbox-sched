@@ -1,4 +1,4 @@
-import express, { Express } from 'express';
+import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
@@ -29,7 +29,7 @@ export function createApp(): Express {
   app.use(cookieParser());
 
   // Health endpoint
-  app.get('/health', (_req, res) => {
+  app.get('/health', (_req: Request, res: Response) => {
     res.status(200).json({
       status: 'ok',
       service: 'preach-inbox-sched-backend',

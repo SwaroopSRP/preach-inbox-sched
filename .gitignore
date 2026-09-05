@@ -7,3 +7,4 @@ coverage/
 .DS_Store
 # Local data directories if any
 data/
+*.rdb
