@@ -22,11 +22,7 @@ function getOAuthClient(): OAuth2Client {
 export function getGoogleOAuthUrl(state?: string): string {
   const client = getOAuthClient();
   const opts: Parameters<typeof client.generateAuthUrl>[0] = {
-    access_type: 'offline',
-    scope: [
-      'https://www.googleapis.com/auth/userinfo.profile',
-      'https://www.googleapis.com/auth/userinfo.email',
-    ],
+    scope: ['openid', 'email', 'profile'],
     prompt: 'select_account',
   };
 
