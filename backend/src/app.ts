@@ -14,6 +14,7 @@ import { notifySlackOnRateLimit } from './modules/slack/slack.service.js';
 import { redis } from './lib/redis.js';
 import { prisma } from './lib/prisma.js';
 import { pingElasticsearch } from './lib/elasticsearch.js';
+import { logger } from './lib/logger.js';
 
 // Register Slack rate-limit notifier hook
 registerRateLimitNotifier(notifySlackOnRateLimit);
@@ -43,6 +44,12 @@ export function createApp(): Express {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
+
+  // Log incoming HTTP requests
+  app.use((req, _res, next) => {
+    logger.info(`HTTP ${req.method} ${req.url}`);
+    next();
+  });
 
   // Health and root keepalive endpoint (completely unauthenticated, no rate limits)
   app.get(['/', '/health'], async (_req: Request, res: Response) => {
@@ -110,6 +117,36 @@ export function createApp(): Express {
         },
       },
     });
+  });
+
+  // Privacy Policy endpoint for Google OAuth verification
+  app.get('/privacy-policy', (_req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>PreachInbox — Privacy Policy</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 720px; margin: 3rem auto; padding: 0 1.5rem; line-height: 1.6; color: #1e293b; }
+          h1 { color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; }
+          h2 { color: #334155; margin-top: 1.75rem; }
+        </style>
+      </head>
+      <body>
+        <h1>Privacy Policy for PreachInbox</h1>
+        <p><em>Last updated: September 2026</em></p>
+        <h2>1. Information We Collect</h2>
+        <p>When you authenticate via Google OAuth, PreachInbox accesses basic profile information (name, email, avatar) to establish your account identity and authorize email dispatch schedules.</p>
+        <h2>2. Use of Google User Data</h2>
+        <p>PreachInbox's use of information received from Google APIs adheres to the Google API Services User Data Policy, including Limited Use requirements. We do not sell or transfer your data to third parties.</p>
+        <h2>3. Data Retention and Security</h2>
+        <p>Your session tokens are stored in secure, encrypted, HTTP-only cookies. Scheduled emails and sender profiles are isolated to your authenticated user account.</p>
+      </body>
+      </html>
+    `);
   });
 
   // Feature routes
