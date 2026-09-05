@@ -17,6 +17,9 @@ const envSchema = z.object({
   // Elasticsearch
   ELASTICSEARCH_URL: z.string().default('http://localhost:9200'),
   ELASTICSEARCH_INDEX: z.string().default('emails'),
+  ELASTICSEARCH_API_KEY: z.string().optional(),
+  ELASTICSEARCH_USERNAME: z.string().optional(),
+  ELASTICSEARCH_PASSWORD: z.string().optional(),
 
   // Google OAuth
   GOOGLE_CLIENT_ID: z.string().default('mock-google-client-id'),

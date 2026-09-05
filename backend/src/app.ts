@@ -13,6 +13,7 @@ import { registerRateLimitNotifier, getActiveWorker } from './workers/email.work
 import { notifySlackOnRateLimit } from './modules/slack/slack.service.js';
 import { redis } from './lib/redis.js';
 import { prisma } from './lib/prisma.js';
+import { pingElasticsearch } from './lib/elasticsearch.js';
 
 // Register Slack rate-limit notifier hook
 registerRateLimitNotifier(notifySlackOnRateLimit);
@@ -78,6 +79,12 @@ export function createApp(): Express {
     const activeWorker = getActiveWorker();
     const workerStatus = activeWorker ? (activeWorker.isRunning() ? 'active' : 'paused') : 'ready';
 
+    const esPing = await withTimeout(
+      pingElasticsearch(),
+      1500,
+      { connected: false, error: 'probe_timeout' }
+    );
+
     res.status(200).json({
       status: 'ok',
       service: 'preach-inbox-sched-backend',
@@ -95,6 +102,11 @@ export function createApp(): Express {
         bullmq: {
           status: redisStatus === 'connected' ? 'ready' : 'degraded',
           worker: workerStatus,
+        },
+        elasticsearch: {
+          status: esPing.connected ? 'connected' : 'disconnected (postgres fallback active)',
+          latencyMs: esPing.latencyMs,
+          version: esPing.version,
         },
       },
     });

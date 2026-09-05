@@ -14,11 +14,39 @@ export interface EmailSearchDocument {
   sentAt?: string | null;
 }
 
+let authConfig: any = undefined;
+if (env.ELASTICSEARCH_API_KEY) {
+  authConfig = { apiKey: env.ELASTICSEARCH_API_KEY };
+} else if (env.ELASTICSEARCH_USERNAME && env.ELASTICSEARCH_PASSWORD) {
+  authConfig = {
+    username: env.ELASTICSEARCH_USERNAME,
+    password: env.ELASTICSEARCH_PASSWORD,
+  };
+}
+
 export const esClient = new Client({
   node: env.ELASTICSEARCH_URL,
-  maxRetries: 0,
-  requestTimeout: 1000,
+  auth: authConfig,
+  maxRetries: 1,
+  requestTimeout: 3000,
 });
+
+export async function pingElasticsearch(): Promise<{ connected: boolean; latencyMs?: number; version?: string; error?: string }> {
+  const start = Date.now();
+  try {
+    const info = await esClient.info();
+    return {
+      connected: true,
+      latencyMs: Date.now() - start,
+      version: info.version.number,
+    };
+  } catch (err: any) {
+    return {
+      connected: false,
+      error: err.message,
+    };
+  }
+}
 
 let isIndexInitialized = false;
 let lastFailureTimestamp = 0;
