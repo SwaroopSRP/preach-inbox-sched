@@ -1,4 +1,4 @@
-import { Worker, Job } from 'bullmq';
+import { Worker, Job, DelayedError } from 'bullmq';
 import { EMAIL_QUEUE_NAME, EmailJobData, emailQueue } from '../queue/email.queue.js';
 import { createRedisConnection } from '../lib/redis.js';
 import { prisma } from '../lib/prisma.js';
@@ -76,7 +76,11 @@ export async function processEmailJob(job: Job<EmailJobData>, token?: string) {
     if (token && typeof job.moveToDelayed === 'function') {
       try {
         await job.moveToDelayed(Date.now() + delayMs, token);
+        throw new DelayedError();
       } catch (err) {
+        if (err instanceof DelayedError) {
+          throw err;
+        }
         logger.debug(`Could not moveToDelayed with token: ${err}`);
       }
     }

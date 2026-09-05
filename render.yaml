@@ -1,0 +1,70 @@
+services:
+  # 1. Express API Web Service
+  - type: web
+    name: preach-inbox-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm start
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: ELASTICSEARCH_URL
+        value: http://localhost:9200
+      - key: ELASTICSEARCH_INDEX
+        value: emails
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        value: http://localhost:5173
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CALLBACK_URL
+        sync: false
+      - key: ETHEREAL_HOST
+        value: smtp.ethereal.email
+      - key: ETHEREAL_PORT
+        value: "587"
+      - key: WORKER_CONCURRENCY
+        value: "5"
+      - key: MIN_EMAIL_DELAY_MS
+        value: "2000"
+      - key: MAX_EMAILS_PER_HOUR_PER_SENDER
+        value: "200"
+
+  # 2. BullMQ Standalone Email Worker
+  - type: worker
+    name: preach-inbox-worker
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm run start:worker
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: ELASTICSEARCH_URL
+        value: http://localhost:9200
+      - key: ELASTICSEARCH_INDEX
+        value: emails
+      - key: ETHEREAL_HOST
+        value: smtp.ethereal.email
+      - key: ETHEREAL_PORT
+        value: "587"
+      - key: WORKER_CONCURRENCY
+        value: "5"
+      - key: MIN_EMAIL_DELAY_MS
+        value: "2000"
+      - key: MAX_EMAILS_PER_HOUR_PER_SENDER
+        value: "200"

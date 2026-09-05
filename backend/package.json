@@ -13,6 +13,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
+    "db:migrate-neon": "tsx src/scripts/migrate-to-neon.ts",
     "test": "vitest run"
   },
   "dependencies": {

@@ -109,7 +109,14 @@ describe('Rate Limiting & Throttling Engine', () => {
       moveToDelayed: moveToDelayedSpy,
     } as unknown as Job<{ emailId: string }>;
 
-    await processEmailJob(mockJob, 'mock-token');
+    try {
+      await processEmailJob(mockJob, 'mock-token');
+    } catch (err) {
+      // BullMQ expects DelayedError when moving a job to delayed
+      if (!(err instanceof Error && err.name === 'DelayedError')) {
+        throw err;
+      }
+    }
 
     // Verification:
     // 1. Job was NOT sent
