@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
 import { logger } from '../../lib/logger.js';
@@ -10,62 +11,60 @@ export interface GoogleUserProfile {
   avatar?: string | null;
 }
 
+function getOAuthClient(): OAuth2Client {
+  return new OAuth2Client(
+    env.GOOGLE_CLIENT_ID.trim(),
+    env.GOOGLE_CLIENT_SECRET.trim(),
+    env.GOOGLE_CALLBACK_URL.trim()
+  );
+}
+
 export function getGoogleOAuthUrl(state?: string): string {
-  const rootUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
-  const options: Record<string, string> = {
-    client_id: env.GOOGLE_CLIENT_ID.trim(),
-    redirect_uri: env.GOOGLE_CALLBACK_URL.trim(),
-    response_type: 'code',
-    scope: 'openid email profile',
+  const client = getOAuthClient();
+  const opts: Parameters<typeof client.generateAuthUrl>[0] = {
+    access_type: 'offline',
+    scope: [
+      'https://www.googleapis.com/auth/userinfo.profile',
+      'https://www.googleapis.com/auth/userinfo.email',
+    ],
     prompt: 'select_account',
   };
 
   if (state && state.trim().length > 0) {
-    options.state = state.trim();
+    opts.state = state.trim();
   }
 
-  const qs = new URLSearchParams(options).toString().replace(/\+/g, '%20');
-  return `${rootUrl}?${qs}`;
+  return client.generateAuthUrl(opts);
 }
 
 export async function getGoogleTokens(code: string): Promise<{ access_token: string; id_token: string }> {
-  const url = 'https://oauth2.googleapis.com/token';
-  const values = {
-    code,
-    client_id: env.GOOGLE_CLIENT_ID,
-    client_secret: env.GOOGLE_CLIENT_SECRET,
-    redirect_uri: env.GOOGLE_CALLBACK_URL,
-    grant_type: 'authorization_code',
-  };
+  if (env.NODE_ENV === 'test' && code.startsWith('mock-')) {
+    return {
+      access_token: 'mock-google-access-token',
+      id_token: 'mock-google-id-token',
+    };
+  }
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams(values),
-  });
+  const client = getOAuthClient();
+  const { tokens } = await client.getToken(code);
 
-  const data = (await res.json()) as { access_token?: string; id_token?: string; error?: string };
-
-  if (!res.ok || !data.access_token) {
+  if (!tokens.access_token) {
     if (env.NODE_ENV === 'test') {
-      logger.warn('Google OAuth code exchange simulated for test suite');
       return {
         access_token: 'mock-google-access-token',
         id_token: 'mock-google-id-token',
       };
     }
-    throw new Error(data.error || 'Failed to exchange Google OAuth code with Google');
+    throw new Error('Failed to retrieve access token from Google');
   }
 
   return {
-    access_token: data.access_token,
-    id_token: data.id_token!,
+    access_token: tokens.access_token,
+    id_token: tokens.id_token || '',
   };
 }
 
-export async function getGoogleUser(accessToken: string): Promise<GoogleUserProfile> {
+export async function getGoogleUser(accessToken: string, idToken?: string): Promise<GoogleUserProfile> {
   if (accessToken === 'mock-google-access-token' && env.NODE_ENV === 'test') {
     return {
       googleId: 'mock-google-id-' + Date.now(),
@@ -73,6 +72,28 @@ export async function getGoogleUser(accessToken: string): Promise<GoogleUserProf
       name: 'Google User',
       avatar: 'https://lh3.googleusercontent.com/a/default-avatar',
     };
+  }
+
+  // If idToken is available, decode and verify using Google certs
+  if (idToken) {
+    try {
+      const client = getOAuthClient();
+      const ticket = await client.verifyIdToken({
+        idToken,
+        audience: env.GOOGLE_CLIENT_ID.trim(),
+      });
+      const payload = ticket.getPayload();
+      if (payload && payload.email) {
+        return {
+          googleId: payload.sub,
+          email: payload.email,
+          name: payload.name || payload.email.split('@')[0],
+          avatar: payload.picture || null,
+        };
+      }
+    } catch (err) {
+      logger.warn(`ID token verification fallback to userinfo API: ${err instanceof Error ? err.message : err}`);
+    }
   }
 
   const res = await fetch(

@@ -21,8 +21,8 @@ export async function googleCallbackHandler(req: Request, res: Response, next: N
       return res.redirect(`${env.FRONTEND_URL}/login?error=missing_code`);
     }
 
-    const { access_token } = await authService.getGoogleTokens(code);
-    const profile = await authService.getGoogleUser(access_token);
+    const { access_token, id_token } = await authService.getGoogleTokens(code);
+    const profile = await authService.getGoogleUser(access_token, id_token);
     const user = await authService.upsertGoogleUser(profile);
     const token = authService.generateJwtToken(user);
 
