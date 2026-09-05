@@ -28,8 +28,8 @@ export function createApp(): Express {
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
 
-  // Health endpoint
-  app.get('/health', (_req: Request, res: Response) => {
+  // Health and root keepalive endpoint (completely unauthenticated, no rate limits)
+  app.get(['/', '/health'], (_req: Request, res: Response) => {
     res.status(200).json({
       status: 'ok',
       service: 'preach-inbox-sched-backend',
