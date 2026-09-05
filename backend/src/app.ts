@@ -11,9 +11,24 @@ import { authRoutes } from './modules/auth/auth.routes.js';
 import { setupBullBoard } from './queue/bullboard.js';
 import { registerRateLimitNotifier } from './workers/email.worker.js';
 import { notifySlackOnRateLimit } from './modules/slack/slack.service.js';
+import { redis } from './lib/redis.js';
+import { prisma } from './lib/prisma.js';
 
 // Register Slack rate-limit notifier hook
 registerRateLimitNotifier(notifySlackOnRateLimit);
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: NodeJS.Timeout;
+  return Promise.race([
+    promise.then((val) => {
+      clearTimeout(timer);
+      return val;
+    }),
+    new Promise<T>((resolve) => {
+      timer = setTimeout(() => resolve(fallback), ms);
+    }),
+  ]);
+}
 
 export function createApp(): Express {
   const app = express();
@@ -29,12 +44,52 @@ export function createApp(): Express {
   app.use(cookieParser());
 
   // Health and root keepalive endpoint (completely unauthenticated, no rate limits)
-  app.get(['/', '/health'], (_req: Request, res: Response) => {
+  app.get(['/', '/health'], async (_req: Request, res: Response) => {
+    let redisStatus = 'disconnected';
+    let redisLatencyMs: number | null = null;
+    try {
+      const start = Date.now();
+      const pong = await withTimeout(redis.ping(), 1500, 'TIMEOUT');
+      if (pong === 'PONG') {
+        redisStatus = 'connected';
+        redisLatencyMs = Date.now() - start;
+      } else if (pong === 'TIMEOUT') {
+        redisStatus = 'timeout';
+      }
+    } catch (err: any) {
+      redisStatus = `error: ${err.message}`;
+    }
+
+    let dbStatus = 'disconnected';
+    let dbLatencyMs: number | null = null;
+    try {
+      const start = Date.now();
+      const result = await withTimeout(prisma.$queryRaw`SELECT 1`, 1500, null);
+      if (result !== null) {
+        dbStatus = 'connected';
+        dbLatencyMs = Date.now() - start;
+      } else {
+        dbStatus = 'timeout';
+      }
+    } catch (err: any) {
+      dbStatus = `error: ${err.message}`;
+    }
+
     res.status(200).json({
       status: 'ok',
       service: 'preach-inbox-sched-backend',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
+      connections: {
+        redis: {
+          status: redisStatus,
+          latencyMs: redisLatencyMs,
+        },
+        database: {
+          status: dbStatus,
+          latencyMs: dbLatencyMs,
+        },
+      },
     });
   });
 
