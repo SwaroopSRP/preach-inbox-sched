@@ -160,6 +160,12 @@ export async function processEmailJob(job: Job<EmailJobData>, token?: string) {
   }
 }
 
+let activeWorkerInstance: Worker<EmailJobData> | null = null;
+
+export function getActiveWorker(): Worker<EmailJobData> | null {
+  return activeWorkerInstance;
+}
+
 export function createEmailWorker(
   processor?: (job: Job<EmailJobData>, token?: string) => Promise<void>
 ) {
@@ -171,6 +177,8 @@ export function createEmailWorker(
       concurrency: env.WORKER_CONCURRENCY,
     }
   );
+
+  activeWorkerInstance = worker;
 
   worker.on('active', (job) => {
     logger.info(`Email job ${job.id} is now active (attempt ${job.attemptsMade + 1})`);

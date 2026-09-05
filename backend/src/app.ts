@@ -9,7 +9,7 @@ import { senderRoutes } from './modules/senders/sender.routes.js';
 import { slackRoutes } from './modules/slack/slack.routes.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { setupBullBoard } from './queue/bullboard.js';
-import { registerRateLimitNotifier } from './workers/email.worker.js';
+import { registerRateLimitNotifier, getActiveWorker } from './workers/email.worker.js';
 import { notifySlackOnRateLimit } from './modules/slack/slack.service.js';
 import { redis } from './lib/redis.js';
 import { prisma } from './lib/prisma.js';
@@ -75,6 +75,9 @@ export function createApp(): Express {
       dbStatus = `error: ${err.message}`;
     }
 
+    const activeWorker = getActiveWorker();
+    const workerStatus = activeWorker ? (activeWorker.isRunning() ? 'active' : 'paused') : 'ready';
+
     res.status(200).json({
       status: 'ok',
       service: 'preach-inbox-sched-backend',
@@ -88,6 +91,10 @@ export function createApp(): Express {
         database: {
           status: dbStatus,
           latencyMs: dbLatencyMs,
+        },
+        bullmq: {
+          status: redisStatus === 'connected' ? 'ready' : 'degraded',
+          worker: workerStatus,
         },
       },
     });
