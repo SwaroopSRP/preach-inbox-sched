@@ -18,7 +18,9 @@ services:
           name: preach-inbox-redis
           property: connectionString
       - key: ELASTICSEARCH_URL
-        value: http://localhost:9200
+        sync: false
+      - key: ELASTICSEARCH_API_KEY
+        sync: false
       - key: ELASTICSEARCH_INDEX
         value: emails
       - key: JWT_SECRET
@@ -61,7 +63,9 @@ services:
           name: preach-inbox-redis
           property: connectionString
       - key: ELASTICSEARCH_URL
-        value: http://localhost:9200
+        sync: false
+      - key: ELASTICSEARCH_API_KEY
+        sync: false
       - key: ELASTICSEARCH_INDEX
         value: emails
       - key: ETHEREAL_HOST
