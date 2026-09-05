@@ -13,8 +13,8 @@ export interface GoogleUserProfile {
 export function getGoogleOAuthUrl(state?: string): string {
   const rootUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
   const options: Record<string, string> = {
-    client_id: env.GOOGLE_CLIENT_ID,
-    redirect_uri: env.GOOGLE_CALLBACK_URL,
+    client_id: env.GOOGLE_CLIENT_ID.trim(),
+    redirect_uri: env.GOOGLE_CALLBACK_URL.trim(),
     response_type: 'code',
     scope: 'openid email profile',
     access_type: 'offline',
@@ -22,11 +22,11 @@ export function getGoogleOAuthUrl(state?: string): string {
   };
 
   if (state && state.trim().length > 0) {
-    options.state = state;
+    options.state = state.trim();
   }
 
-  const qs = new URLSearchParams(options);
-  return `${rootUrl}?${qs.toString()}`;
+  const qs = new URLSearchParams(options).toString().replace(/\+/g, '%20');
+  return `${rootUrl}?${qs}`;
 }
 
 export async function getGoogleTokens(code: string): Promise<{ access_token: string; id_token: string }> {

@@ -36,7 +36,7 @@ describe('Elasticsearch Projection & Search API', () => {
     senderAId = senderA.id;
 
     // Seed test emails for User A
-    await prisma.email.create({
+    const e1 = await prisma.email.create({
       data: {
         userId: userAId,
         senderId: senderAId,
@@ -48,7 +48,7 @@ describe('Elasticsearch Projection & Search API', () => {
       },
     });
 
-    await prisma.email.create({
+    const e2 = await prisma.email.create({
       data: {
         userId: userAId,
         senderId: senderAId,
@@ -62,7 +62,7 @@ describe('Elasticsearch Projection & Search API', () => {
     });
 
     // Seed test email for User B with similar keyword to test user isolation
-    await prisma.email.create({
+    const e3 = await prisma.email.create({
       data: {
         userId: userBId,
         senderId: senderAId, // arbitrary sender reference for test
@@ -73,6 +73,42 @@ describe('Elasticsearch Projection & Search API', () => {
         scheduledAt: new Date(),
       },
     });
+
+    // Ensure documents are indexed in Elasticsearch
+    const { indexEmailDocument } = await import('../src/lib/elasticsearch.js');
+    await Promise.all([
+      indexEmailDocument({
+        id: e1.id,
+        userId: e1.userId,
+        senderId: e1.senderId,
+        recipient: e1.recipient,
+        subject: e1.subject,
+        body: e1.body,
+        status: e1.status,
+        scheduledAt: e1.scheduledAt.toISOString(),
+      }),
+      indexEmailDocument({
+        id: e2.id,
+        userId: e2.userId,
+        senderId: e2.senderId,
+        recipient: e2.recipient,
+        subject: e2.subject,
+        body: e2.body,
+        status: e2.status,
+        scheduledAt: e2.scheduledAt.toISOString(),
+        sentAt: e2.sentAt?.toISOString(),
+      }),
+      indexEmailDocument({
+        id: e3.id,
+        userId: e3.userId,
+        senderId: e3.senderId,
+        recipient: e3.recipient,
+        subject: e3.subject,
+        body: e3.body,
+        status: e3.status,
+        scheduledAt: e3.scheduledAt.toISOString(),
+      }),
+    ]);
   });
 
   afterAll(async () => {

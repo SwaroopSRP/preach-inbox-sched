@@ -5,6 +5,9 @@ import { env } from '../../config/env.js';
 export async function googleLoginHandler(_req: Request, res: Response, next: NextFunction) {
   try {
     const url = authService.getGoogleOAuthUrl();
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.redirect(url);
   } catch (err) {
     next(err);
