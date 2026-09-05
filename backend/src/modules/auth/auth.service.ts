@@ -12,18 +12,18 @@ export interface GoogleUserProfile {
 
 export function getGoogleOAuthUrl(state?: string): string {
   const rootUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
-  const options = {
-    redirect_uri: env.GOOGLE_CALLBACK_URL,
+  const options: Record<string, string> = {
     client_id: env.GOOGLE_CLIENT_ID,
-    access_type: 'offline',
+    redirect_uri: env.GOOGLE_CALLBACK_URL,
     response_type: 'code',
+    scope: 'openid email profile',
+    access_type: 'offline',
     prompt: 'consent',
-    scope: [
-      'https://www.googleapis.com/auth/userinfo.profile',
-      'https://www.googleapis.com/auth/userinfo.email',
-    ].join(' '),
-    state: state || '',
   };
+
+  if (state && state.trim().length > 0) {
+    options.state = state;
+  }
 
   const qs = new URLSearchParams(options);
   return `${rootUrl}?${qs.toString()}`;
