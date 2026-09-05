@@ -6,5 +6,6 @@ export const authRoutes = Router();
 
 authRoutes.get('/google', authController.googleLoginHandler);
 authRoutes.get('/google/callback', authController.googleCallbackHandler);
+authRoutes.get('/dev-login', authController.devLoginHandler);
 authRoutes.get('/me', requireAuth, authController.getCurrentUserHandler);
 authRoutes.post('/logout', authController.logoutHandler);

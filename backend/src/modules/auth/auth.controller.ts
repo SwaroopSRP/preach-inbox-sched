@@ -131,6 +131,66 @@ export async function googleCallbackHandler(req: Request, res: Response, next: N
   }
 }
 
+export async function devLoginHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const email = (req.query.email as string) || 'srp31.swaroop@gmail.com';
+    const name = (req.query.name as string) || 'Swaroop (Dev)';
+    const avatar = 'https://lh3.googleusercontent.com/a/default-user';
+
+    const user = await authService.upsertGoogleUser({
+      googleId: 'google-dev-' + email,
+      email,
+      name,
+      avatar,
+    });
+
+    const token = authService.generateJwtToken(user);
+
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    if (req.headers.accept?.includes('application/json') || req.query.format === 'json') {
+      return res.json({ success: true, user, token });
+    }
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <title>PreachInbox — Authenticated</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+          .card { background: #1e293b; border: 1px solid #334155; padding: 2.5rem; border-radius: 12px; text-align: center; max-width: 420px; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.3); }
+          .avatar { width: 72px; height: 72px; border-radius: 50%; border: 3px solid #38bdf8; margin-bottom: 1rem; object-fit: cover; }
+          h2 { margin: 0 0 0.5rem 0; font-size: 1.5rem; }
+          p { color: #94a3b8; margin: 0 0 1.25rem 0; }
+          .badge { display: inline-block; background: #0369a1; color: #e0f2fe; padding: 0.35rem 0.85rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 500; margin-bottom: 1.5rem; }
+          .btn { display: block; background: #0284c7; color: #ffffff; text-decoration: none; padding: 0.75rem 1.25rem; border-radius: 8px; font-weight: 600; margin-top: 0.5rem; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <img class="avatar" src="${avatar}" alt="${name}" />
+          <h2>Welcome, ${name}!</h2>
+          <p>${email}</p>
+          <div class="badge">✓ Session Active & Token Cookie Set</div>
+          <a class="btn" href="/api/auth/me" target="_blank">Verify Session (/api/auth/me) &rarr;</a>
+          <a class="btn" style="background: #334155;" href="${env.FRONTEND_URL}/dashboard">Continue to Dashboard &rarr;</a>
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getCurrentUserHandler(req: Request, res: Response, next: NextFunction) {
   try {
     if (!req.user) {
