@@ -117,14 +117,12 @@ export async function googleCallbackHandler(req: Request, res: Response, next: N
           <h2>Welcome, ${user.name}!</h2>
           <p>${user.email}</p>
           <div class="badge">✓ Google OAuth Verified & Session Cookie Set</div>
-          <a class="btn" href="${env.FRONTEND_URL}/dashboard">Continue to Dashboard &rarr;</a>
-          <p class="subtext">Redirecting automatically in 3 seconds...</p>
+          <div style="display: flex; gap: 0.75rem; justify-content: center; flex-direction: column;">
+            <a class="btn" href="/api/auth/me" target="_blank">Verify Session (/api/auth/me) &rarr;</a>
+            <a class="btn" style="background: #334155;" href="${env.FRONTEND_URL}/dashboard">Continue to Dashboard &rarr;</a>
+          </div>
+          <p class="subtext">Session cookie 'token' has been securely set.</p>
         </div>
-        <script>
-          setTimeout(() => {
-            window.location.href = '${env.FRONTEND_URL}/dashboard';
-          }, 3000);
-        </script>
       </body>
       </html>
     `);
