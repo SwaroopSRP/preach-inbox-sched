@@ -13,7 +13,10 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: REDIS_URL
-        sync: false
+        fromService:
+          type: redis
+          name: preach-inbox-redis
+          property: connectionString
       - key: ELASTICSEARCH_URL
         value: http://localhost:9200
       - key: ELASTICSEARCH_INDEX
@@ -53,7 +56,10 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: REDIS_URL
-        sync: false
+        fromService:
+          type: redis
+          name: preach-inbox-redis
+          property: connectionString
       - key: ELASTICSEARCH_URL
         value: http://localhost:9200
       - key: ELASTICSEARCH_INDEX
@@ -68,3 +74,9 @@ services:
         value: "2000"
       - key: MAX_EMAILS_PER_HOUR_PER_SENDER
         value: "200"
+
+  # 3. Render Managed Redis (Free Plan)
+  - type: redis
+    name: preach-inbox-redis
+    plan: free
+    ipAllowList: [] # internal network only for maximum security

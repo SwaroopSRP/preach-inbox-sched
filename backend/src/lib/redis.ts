@@ -3,9 +3,12 @@ import { env } from '../config/env.js';
 import { logger } from './logger.js';
 
 export function createRedisConnection(name = 'default'): Redis {
+  const isTls = env.REDIS_URL.startsWith('rediss://');
+
   const connection = new Redis(env.REDIS_URL, {
     maxRetriesPerRequest: null, // Critical requirement for BullMQ
     enableReadyCheck: false,
+    tls: isTls ? { rejectUnauthorized: false } : undefined,
     retryStrategy(times) {
       const delay = Math.min(times * 100, 3000);
       return delay;
