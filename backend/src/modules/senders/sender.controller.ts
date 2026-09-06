@@ -37,7 +37,7 @@ export async function createEtherealSenderHandler(req: Request, res: Response, n
 export async function deleteSenderHandler(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = req.user?.id as string;
-    const senderId = req.params.id;
+    const senderId = req.params.id as string;
     await senderService.deleteSender(userId, senderId);
     res.json({ success: true, message: 'Sender deleted successfully' });
   } catch (err) {
