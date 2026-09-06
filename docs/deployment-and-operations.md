@@ -63,6 +63,7 @@ When deploying to Render or configuring local development, ensure the following 
 | `SLACK_CLIENT_ID` | Optional | Slack App OAuth Client ID | `***` |
 | `SLACK_CLIENT_SECRET` | Optional | Slack App OAuth Client Secret | `***` |
 | `SLACK_REDIRECT_URI` | Optional | Slack OAuth Redirect URI | `https://preach-inbox-api.onrender.com/api/integrations/slack/callback` |
+| `SLACK_WEBHOOK_URL` | Optional | Direct Slack Incoming Webhook URL (alternative to OAuth) | `https://hooks.slack.com/services/***` |
 | `ETHEREAL_USER` | Optional | Dedicated Ethereal mailbox username | `your-account@ethereal.email` |
 | `ETHEREAL_PASSWORD` | Optional | Dedicated Ethereal mailbox password | `your-password` |
 
@@ -180,6 +181,9 @@ npx tsx src/scripts/test-ethereal.ts
 # 2. Test full end-to-end flow: DB -> BullMQ Delayed Queue -> Worker -> Ethereal
 npx tsx src/scripts/test-end-to-end-email.ts
 
-# 3. Test Elasticsearch connectivity & search query execution
-npx tsx src/scripts/test-elasticsearch.ts
+# 4. Run automated 15-step blackbox systems test (zero mocks, real HTTP)
+npm run test:system
+
+# 5. Run blackbox test against cloud deployment
+API_URL=https://preach-inbox-api.onrender.com npm run test:system
 ```

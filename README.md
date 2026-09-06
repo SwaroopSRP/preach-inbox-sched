@@ -142,5 +142,11 @@ npx tsx src/scripts/test-end-to-end-email.ts
 
 # 3. Verify Elasticsearch cluster connectivity & indexing
 npx tsx src/scripts/test-elasticsearch.ts
+
+# 4. Run automated 15-step blackbox systems test (zero mocks, real HTTP)
+npm run test:system
+
+# 5. Live Bull Board demo (schedule 5 staggered emails while watching the UI)
+npx tsx src/scripts/demo-live-schedule.ts
 ```
 
