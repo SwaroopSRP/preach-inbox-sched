@@ -85,7 +85,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       return next();
     }
 
-    throw new AppError(401, 'Authentication required. Please log in via Google OAuth at /api/auth/google');
+    throw new AppError(401, 'Authentication required. Please log in at /api/auth/login or /api/auth/google');
   } catch (err) {
     next(err);
   }

@@ -1,5 +1,5 @@
 import { Worker, Job, DelayedError } from 'bullmq';
-import { EMAIL_QUEUE_NAME, EmailJobData, emailQueue } from '../queue/email.queue.js';
+import { EMAIL_QUEUE_NAME, EmailJobData } from '../queue/email.queue.js';
 import { createRedisConnection } from '../lib/redis.js';
 import { prisma } from '../lib/prisma.js';
 import { sendEmail } from '../integrations/mailer/mailer.service.js';
@@ -10,7 +10,7 @@ import { logger } from '../lib/logger.js';
 
 const workerRedisConnection = createRedisConnection('worker');
 
-// Optional hook for Slack notifications on rate-limit hit (wired in Phase 8)
+// Hook for automated Slack alerting on hourly rate-limit hit
 export type RateLimitNotifyFn = (userId: string, senderEmail: string, maxHourly: number) => Promise<void>;
 let rateLimitNotifier: RateLimitNotifyFn | null = null;
 

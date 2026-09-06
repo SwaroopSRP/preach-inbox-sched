@@ -45,11 +45,13 @@ export function createApp(): Express {
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
 
-  // Log incoming HTTP requests
-  app.use((req, _res, next) => {
-    logger.info(`HTTP ${req.method} ${req.url}`);
-    next();
-  });
+  // Log incoming HTTP requests in development & production
+  if (env.NODE_ENV !== 'test') {
+    app.use((req, _res, next) => {
+      logger.info(`HTTP ${req.method} ${req.url}`);
+      next();
+    });
+  }
 
   // Health and root keepalive endpoint (completely unauthenticated, no rate limits)
   app.get(['/', '/health'], async (_req: Request, res: Response) => {
