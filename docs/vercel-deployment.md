@@ -107,3 +107,13 @@ When your frontend is hosted on Vercel (`https://your-app.vercel.app`) and your 
 2. **Cross-Origin Cookie Delivery**:
    - The backend sets `SameSite=None; Secure` cookies in cross-origin production environments or standard `SameSite=Lax` on matching top-level domains.
    - Web requests via Axios use `withCredentials: true` (`frontend/src/services/api.ts`).
+
+---
+
+## 4. Related Documentation
+
+- **[Frontend Architecture Guide](frontend.md)**
+- **[Deployment & Cloud Operations Guide](deployment-and-operations.md)**
+- **[System Architecture & Design](architecture.md)**
+- **[Root Repository Overview](../README.md)**
+

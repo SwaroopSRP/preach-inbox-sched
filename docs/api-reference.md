@@ -596,3 +596,15 @@ All errors from the API return a standardized JSON format:
 | `404 Not Found` | Resource Not Found | Email ID or Sender ID does not exist or belongs to another user. |
 | `409 Conflict` | Conflict | Duplicate entry (e.g., creating a sender email that already exists for this user). |
 | `500 Internal Server Error` | Server Exception | Unhandled internal server error. |
+
+---
+
+## Related Documentation
+
+- **[System Architecture & Design](architecture.md)**
+- **[Scheduling, BullMQ Queues & Idempotency](scheduling-and-queues.md)**
+- **[Frontend Architecture Guide](frontend.md)**
+- **[Frontend API Integration Guide](frontend-integration.md)**
+- **[Deployment & Cloud Operations Guide](deployment-and-operations.md)**
+- **[Root Repository Overview](../README.md)**
+

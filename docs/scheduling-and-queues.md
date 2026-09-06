@@ -231,3 +231,14 @@ When a user imports a CSV of 1,000 recipients scheduled at the same second:
    - The worker automatically moves them to the next UTC hour window ($T + 3600\text{s}$).
    - A single Slack alert is dispatched to notify the team.
    - CPU, memory, and database connections remain flat and stable throughout the entire dispatch cycle.
+
+---
+
+## 7. Related Documentation
+
+- **[System Architecture & Design](architecture.md)**
+- **[Complete REST API Reference](api-reference.md)**
+- **[Frontend Architecture & UI Guide](frontend.md)**
+- **[Deployment & Cloud Operations Guide](deployment-and-operations.md)**
+- **[Root Repository Overview](../README.md)**
+

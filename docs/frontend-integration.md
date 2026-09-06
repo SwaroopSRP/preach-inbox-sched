@@ -550,3 +550,14 @@ Frontend developers can follow this structural layout for high usability:
    - "Send Now" button (sets `scheduledAt = new Date().toISOString()`).
    - "Schedule for Later" datetime picker (converts local selection to UTC ISO string: `date.toISOString()`).
 6. **Submit**: Calls `scheduleBatch({ senderId, recipients, subject, body, scheduledAt })`.
+
+---
+
+## 11. Related Documentation
+
+- **[Comprehensive Frontend Architecture Guide](frontend.md)**
+- **[Complete REST API Reference](api-reference.md)**
+- **[System Architecture & Design](architecture.md)**
+- **[Vercel Frontend Deployment Guide](vercel-deployment.md)**
+- **[Root Repository Overview](../README.md)**
+

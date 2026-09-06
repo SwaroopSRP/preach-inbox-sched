@@ -218,7 +218,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({ onBack, onEmailSched
     setLoading(true);
 
     try {
-      const scheduledTime = scheduledDate || new Date(Date.now() + 500).toISOString();
+      const scheduledTime = scheduledDate || new Date(Date.now() + 5000).toISOString();
 
       const payload: ScheduleEmailPayload = {
         senderId: selectedSenderId,
@@ -292,11 +292,10 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({ onBack, onEmailSched
               }
               setShowSendLaterModal(true);
             }}
-            className={`p-2 rounded-full transition-colors cursor-pointer ${
-              scheduledDate
+            className={`p-2 rounded-full transition-colors cursor-pointer ${scheduledDate
                 ? 'text-brand-600 bg-brand-50 dark:bg-emerald-950/60'
                 : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-surface-darkInput'
-            }`}
+              }`}
             title="Send later"
           >
             <Clock className="w-5 h-5" />

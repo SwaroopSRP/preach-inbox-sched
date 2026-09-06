@@ -214,3 +214,15 @@ model SlackConnection {
 - Browser privacy extensions (such as **ClearURLs** or Brave Shields in strict mode) strip URL parameters from Google OAuth redirects (such as `part`, `rapt`, `xsrf`), causing Google's `signin/oauth/v3/consent` endpoint to return an HTTP 400 Bad Request error.
 - Users and testers running such extensions should whitelist `accounts.google.com` or use standard browser profiles.
 - A development login bypass (`GET /api/auth/dev-login`) is also provided to enable instant, unblocked local frontend development.
+
+---
+
+## 6. Related Documentation
+
+- **[Scheduling, BullMQ Queues & Idempotency](scheduling-and-queues.md)**
+- **[Complete REST API Reference](api-reference.md)**
+- **[Frontend Architecture & UI Guide](frontend.md)**
+- **[Deployment & Cloud Operations Guide](deployment-and-operations.md)**
+- **[Vercel Frontend Deployment](vercel-deployment.md)**
+- **[Root Repository Overview](../README.md)**
+

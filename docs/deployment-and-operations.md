@@ -187,3 +187,15 @@ npm run test:system
 # 5. Run blackbox test against cloud deployment
 API_URL=https://preach-inbox-api.onrender.com npm run test:system
 ```
+
+---
+
+## 11. Related Documentation
+
+- **[System Architecture & Design](architecture.md)**
+- **[Scheduling, BullMQ Queues & Idempotency](scheduling-and-queues.md)**
+- **[Complete REST API Reference](api-reference.md)**
+- **[Frontend Architecture Guide](frontend.md)**
+- **[Vercel Frontend Deployment](vercel-deployment.md)**
+- **[Root Repository Overview](../README.md)**
+

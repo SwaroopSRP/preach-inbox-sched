@@ -59,7 +59,7 @@ export async function scheduleEmails(userId: string, input: ScheduleEmailInput) 
       status: email.status,
       scheduledAt: email.scheduledAt.toISOString(),
       sentAt: null,
-    }).catch(() => {});
+    }).catch(() => { });
 
     createdEmails.push(email);
   }
@@ -90,17 +90,14 @@ export async function listSentEmails(userId: string) {
   return prisma.email.findMany({
     where: {
       userId,
-      status: { in: ['SENT', 'FAILED'] },
+      status: 'SENT',
     },
     include: {
       sender: {
         select: { id: true, email: true, name: true },
       },
     },
-    orderBy: [
-      { sentAt: 'desc' },
-      { createdAt: 'desc' },
-    ],
+    orderBy: { sentAt: 'desc' },
   });
 }
 

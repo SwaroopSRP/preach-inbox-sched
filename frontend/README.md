@@ -120,3 +120,13 @@ npm run build
 # Preview production build locally
 npm run preview
 ```
+
+---
+
+## 📚 Additional Documentation
+
+- **[Root Repository Overview & Architecture](../README.md)**
+- **[Comprehensive Frontend Architecture Guide](../docs/frontend.md)**
+- **[Frontend API Integration Specification](../docs/frontend-integration.md)**
+- **[Vercel Cloud Deployment Guide](../docs/vercel-deployment.md)**
+
