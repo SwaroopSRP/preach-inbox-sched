@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import type { Email } from '../../types/api';
 import { Clock, Star, Mail, AlertTriangle, ArrowRight } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -9,6 +9,9 @@ interface EmailListProps {
   loading: boolean;
   onSelectEmail: (email: Email) => void;
   onComposeClick: () => void;
+  starredIds: Set<string>;
+  onToggleStar: (id: string) => void;
+  isFilterActive?: boolean;
 }
 
 export const EmailList: React.FC<EmailListProps> = ({
@@ -17,19 +20,10 @@ export const EmailList: React.FC<EmailListProps> = ({
   loading,
   onSelectEmail,
   onComposeClick,
+  starredIds,
+  onToggleStar,
+  isFilterActive = false,
 }) => {
-  const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
-
-  const toggleStar = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    setStarredIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
   const formatScheduledBadge = (dateStr: string) => {
     try {
       const d = parseISO(dateStr);
@@ -63,6 +57,22 @@ export const EmailList: React.FC<EmailListProps> = ({
   }
 
   if (emails.length === 0) {
+    if (isFilterActive) {
+      return (
+        <div className="h-[60vh] flex flex-col items-center justify-center text-center p-6 select-none animate-fadeIn">
+          <div className="w-16 h-16 rounded-full bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center text-amber-500 mb-4 border border-amber-100 dark:border-amber-800/30">
+            <Star className="w-7 h-7 fill-amber-400 text-amber-400" />
+          </div>
+          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">
+            No starred emails found
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mb-6">
+            Click the star icon next to any email in your {type === 'scheduled' ? 'scheduled' : 'sent'} inbox to bookmark it here for quick access.
+          </p>
+        </div>
+      );
+    }
+
     return (
       <div className="h-[60vh] flex flex-col items-center justify-center text-center p-6 select-none">
         <div className="w-16 h-16 rounded-full bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center text-brand-500 mb-4 border border-emerald-100 dark:border-emerald-800/30">
@@ -143,8 +153,12 @@ export const EmailList: React.FC<EmailListProps> = ({
             {/* Star action */}
             <button
               type="button"
-              onClick={(e) => toggleStar(e, email.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleStar(email.id);
+              }}
               className="p-1.5 text-gray-300 hover:text-amber-400 dark:text-gray-600 dark:hover:text-amber-400 transition-colors flex-shrink-0 cursor-pointer"
+              title={isStarred ? 'Unstar' : 'Star'}
             >
               <Star className={`w-4 h-4 ${isStarred ? 'fill-amber-400 text-amber-400' : ''}`} />
             </button>
@@ -154,3 +168,4 @@ export const EmailList: React.FC<EmailListProps> = ({
     </div>
   );
 };
+

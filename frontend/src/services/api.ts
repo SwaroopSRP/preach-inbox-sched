@@ -65,6 +65,13 @@ export const api = {
       const res = await apiClient.post<{ sender: Sender }>('/api/senders', { name, email });
       return res.data.sender;
     },
+    async createEthereal(name?: string): Promise<Sender> {
+      const res = await apiClient.post<{ sender: Sender }>('/api/senders/ethereal', { name });
+      return res.data.sender;
+    },
+    async delete(id: string): Promise<void> {
+      await apiClient.delete(`/api/senders/${id}`);
+    },
   },
 
   emails: {

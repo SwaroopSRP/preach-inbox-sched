@@ -7,14 +7,38 @@ import { Header } from './components/layout/Header';
 import { EmailList } from './components/inbox/EmailList';
 import { EmailDetail } from './components/inbox/EmailDetail';
 import { ComposeModal } from './components/compose/ComposeModal';
-import { SettingsModal } from './components/settings/SettingsModal';
+import { PreferencesDrawer } from './components/settings/PreferencesDrawer';
 import { api } from './services/api';
 import type { Email, ActiveTab } from './types/api';
 
 const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('scheduled');
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'starred'>('all');
+
+  const [starredIds, setStarredIds] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('preach_starred_email_ids');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  const toggleStar = (id: string) => {
+    setStarredIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      try {
+        localStorage.setItem('preach_starred_email_ids', JSON.stringify(Array.from(next)));
+      } catch (err) {
+        console.error('Failed to persist starred emails:', err);
+      }
+      return next;
+    });
+  };
 
   const [scheduledEmails, setScheduledEmails] = useState<Email[]>([]);
   const [sentEmails, setSentEmails] = useState<Email[]>([]);
@@ -82,13 +106,17 @@ const Dashboard: React.FC = () => {
     setSelectedEmail(null);
   };
 
-  const displayedEmails = searchResults
+  const baseEmails = searchResults
     ? searchResults.filter((e) =>
         activeTab === 'scheduled' ? e.status === 'SCHEDULED' : e.status === 'SENT' || e.status === 'FAILED'
       )
     : activeTab === 'scheduled'
     ? scheduledEmails
     : sentEmails;
+
+  const displayedEmails = filter === 'starred'
+    ? baseEmails.filter((e) => starredIds.has(e.id))
+    : baseEmails;
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-white dark:bg-surface-dark transition-colors font-sans">
@@ -98,7 +126,7 @@ const Dashboard: React.FC = () => {
         onTabChange={handleTabChange}
         scheduledCount={scheduledEmails.length}
         sentCount={sentEmails.length}
-        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenPreferences={() => setIsPreferencesOpen(true)}
         onOpenCompose={handleOpenCompose}
       />
 
@@ -113,7 +141,12 @@ const Dashboard: React.FC = () => {
             }}
           />
         ) : selectedEmail ? (
-          <EmailDetail email={selectedEmail} onBack={() => setSelectedEmail(null)} />
+          <EmailDetail
+            email={selectedEmail}
+            onBack={() => setSelectedEmail(null)}
+            isStarred={starredIds.has(selectedEmail.id)}
+            onToggleStar={() => toggleStar(selectedEmail.id)}
+          />
         ) : (
           <>
             {/* Top Search & Action Bar */}
@@ -122,6 +155,8 @@ const Dashboard: React.FC = () => {
               onSearchChange={setSearchQuery}
               onRefresh={loadEmails}
               isRefreshing={isRefreshing}
+              filter={filter}
+              onFilterChange={setFilter}
             />
 
             {/* Email List Feed */}
@@ -132,16 +167,19 @@ const Dashboard: React.FC = () => {
                 loading={activeTab === 'scheduled' ? loadingScheduled : loadingSent}
                 onSelectEmail={(email) => setSelectedEmail(email)}
                 onComposeClick={handleOpenCompose}
+                starredIds={starredIds}
+                onToggleStar={toggleStar}
+                isFilterActive={filter === 'starred'}
               />
             </main>
           </>
         )}
       </div>
 
-      {/* Settings & Slack Modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
+      {/* Preferences Slide-In Side Panel */}
+      <PreferencesDrawer
+        isOpen={isPreferencesOpen}
+        onClose={() => setIsPreferencesOpen(false)}
         onSendersUpdated={loadEmails}
       />
     </div>

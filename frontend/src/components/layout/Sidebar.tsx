@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import type { ActiveTab } from '../../types/api';
+import { api } from '../../services/api';
+import type { ActiveTab, SlackStatus } from '../../types/api';
 import {
   Clock,
   Send,
   ChevronDown,
   Settings as SettingsIcon,
   LogOut,
-  ExternalLink,
   Plus,
 } from 'lucide-react';
 
@@ -16,22 +16,47 @@ interface SidebarProps {
   onTabChange: (tab: ActiveTab) => void;
   scheduledCount: number;
   sentCount: number;
-  onOpenSettings: () => void;
+  onOpenPreferences: () => void;
   onOpenCompose: () => void;
 }
+
+// Slack Brand Icon SVG
+const SlackIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.528 2.528 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"
+      fill="#E01E5A"
+    />
+  </svg>
+);
 
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onTabChange,
   scheduledCount,
   sentCount,
-  onOpenSettings,
+  onOpenPreferences,
   onOpenCompose,
 }) => {
   const { user, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [slackStatus, setSlackStatus] = useState<SlackStatus | null>(null);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
 
-  const adminQueuesUrl = `${import.meta.env.VITE_API_URL || ''}/admin/queues`;
+  useEffect(() => {
+    api.slack.getStatus().then(setSlackStatus).catch(() => {});
+  }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <aside className="w-64 flex-shrink-0 h-screen bg-white dark:bg-surface-darkCard border-r border-gray-100 dark:border-surface-darkBorder flex flex-col justify-between p-5 transition-colors select-none">
@@ -46,7 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* User Card / Dropdown Trigger */}
-        <div className="relative">
+        <div className="relative" ref={dropdownRef}>
           <button
             type="button"
             onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -76,42 +101,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
           </button>
 
-          {/* User Dropdown Menu */}
+          {/* User Dropdown Menu - ONLY Slack Connect & Sign Out */}
           {dropdownOpen && (
             <div
-              className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-surface-darkCard rounded-xl shadow-lg border border-gray-100 dark:border-surface-darkBorder py-1.5 z-40 animate-fadeIn"
+              className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-surface-darkCard rounded-2xl shadow-xl border border-gray-100 dark:border-surface-darkBorder py-1.5 z-40 animate-fadeIn"
               onMouseLeave={() => setDropdownOpen(false)}
             >
-              <button
-                type="button"
-                onClick={() => {
-                  setDropdownOpen(false);
-                  onOpenSettings();
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-surface-darkInput transition-colors cursor-pointer"
-              >
-                <SettingsIcon className="w-3.5 h-3.5 text-gray-400" />
-                <span>Settings & Slack</span>
-              </button>
-              <a
-                href={adminQueuesUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-surface-darkInput transition-colors cursor-pointer"
-              >
-                <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
-                <span>BullMQ Dashboard</span>
-              </a>
+              {/* Slack connect option */}
+              {slackStatus?.connected ? (
+                <div className="w-full flex items-center justify-between px-3.5 py-2.5 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-surface-darkInput transition-colors">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <SlackIcon className="w-4 h-4 flex-shrink-0" />
+                    <span className="truncate font-medium">Slack connected</span>
+                  </div>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" title="Connected" />
+                </div>
+              ) : (
+                <a
+                  href={api.slack.getConnectUrl()}
+                  className="w-full flex items-center gap-2 px-3.5 py-2.5 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-surface-darkInput transition-colors cursor-pointer"
+                  onClick={() => setDropdownOpen(false)}
+                >
+                  <SlackIcon className="w-4 h-4 flex-shrink-0" />
+                  <span className="font-medium">Connect Slack</span>
+                </a>
+              )}
+
               <div className="my-1 border-t border-gray-100 dark:border-surface-darkBorder" />
+
+              {/* Sign Out Option */}
               <button
                 type="button"
                 onClick={() => {
                   setDropdownOpen(false);
                   logout();
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2 px-3.5 py-2.5 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer font-medium"
               >
-                <LogOut className="w-3.5 h-3.5" />
+                <LogOut className="w-4 h-4 flex-shrink-0" />
                 <span>Sign Out</span>
               </button>
             </div>
@@ -186,17 +213,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </nav>
       </div>
 
-      {/* Bottom Settings Link */}
+      {/* Bottom Preferences Link - ONLY ONCE HERE */}
       <div className="pt-4 border-t border-gray-100 dark:border-surface-darkBorder">
         <button
           type="button"
-          onClick={onOpenSettings}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-surface-darkInput transition-colors cursor-pointer"
+          onClick={() => {
+            setDropdownOpen(false);
+            onOpenPreferences();
+          }}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-surface-darkInput transition-colors cursor-pointer font-medium"
         >
           <SettingsIcon className="w-4 h-4" />
-          <span>Preferences & Slack</span>
+          <span>Preferences</span>
         </button>
       </div>
     </aside>
   );
 };
+

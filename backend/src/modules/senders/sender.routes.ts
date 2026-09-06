@@ -8,3 +8,6 @@ senderRoutes.use(requireAuth);
 
 senderRoutes.get('/', senderController.getSendersHandler);
 senderRoutes.post('/', senderController.createSenderHandler);
+senderRoutes.post('/ethereal', senderController.createEtherealSenderHandler);
+senderRoutes.delete('/:id', senderController.deleteSenderHandler);
+
