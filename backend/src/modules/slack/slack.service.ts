@@ -144,37 +144,51 @@ export async function notifySlackOnRateLimit(userId: string, senderEmail: string
     return;
   }
 
-  // 2. Lookup Slack connection for the user
+  const message = `⚠️ *PreachInbox Alert*: Sender \`${senderEmail}\` reached its hourly email limit of ${maxHourly}.\nRemaining scheduled emails will automatically continue in the next available window.`;
+
+  // 2. Lookup Slack OAuth connection for the user
   const connection = await prisma.slackConnection.findUnique({
     where: { userId },
   });
 
-  if (!connection) {
-    logger.debug(`User ${userId} does not have an active Slack connection. Skipping notification.`);
-    return;
-  }
-
-  const message = `⚠️ *PreachInbox Alert*: Sender \`${senderEmail}\` reached its hourly email limit of ${maxHourly}.\nRemaining scheduled emails will automatically continue in the next available window.`;
-
-  const targetChannel = connection.channelId || 'general';
-
-  // In dev / test or with mock token, log cleanly
-  if (connection.accessToken.startsWith('mock-slack-token')) {
-    logger.info(`[MOCK SLACK DISPATCH] Channel: ${targetChannel} | Message: ${message}`);
-    return;
-  }
-
-  try {
-    const res = (await postSlackMessage(connection.accessToken, targetChannel, message)) as {
-      ok: boolean;
-      error?: string;
-    };
-    if (res.ok) {
-      logger.info(`Slack rate-limit notification successfully sent for ${senderEmail}`);
-    } else {
-      logger.warn(`Slack API error sending notification: ${res.error}`);
+  // If user has a real OAuth token, post directly to their connected channel
+  if (connection && !connection.accessToken.startsWith('mock-slack-token')) {
+    const targetChannel = connection.channelId || 'general';
+    try {
+      const res = (await postSlackMessage(connection.accessToken, targetChannel, message)) as {
+        ok: boolean;
+        error?: string;
+      };
+      if (res.ok) {
+        logger.info(`Slack rate-limit notification successfully sent for ${senderEmail} to channel ${targetChannel}`);
+        return;
+      } else {
+        logger.warn(`Slack API error sending notification: ${res.error}`);
+      }
+    } catch (err) {
+      logger.error(`Error sending message to Slack API: ${err instanceof Error ? err.message : err}`);
     }
-  } catch (err) {
-    logger.error(`Error sending message to Slack API: ${err instanceof Error ? err.message : err}`);
   }
+
+  // 3. Fallback to global incoming webhook URL if configured in environment
+  if (env.SLACK_WEBHOOK_URL) {
+    try {
+      const webhookRes = await fetch(env.SLACK_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: message }),
+      });
+      if (webhookRes.ok) {
+        logger.info(`Slack rate-limit notification successfully sent via SLACK_WEBHOOK_URL for ${senderEmail}`);
+        return;
+      }
+      logger.warn(`Slack webhook returned status ${webhookRes.status}`);
+    } catch (err) {
+      logger.error(`Error dispatching to SLACK_WEBHOOK_URL: ${err instanceof Error ? err.message : err}`);
+    }
+  }
+
+  // 4. In development, test, or mock mode without live credentials
+  const targetChannel = connection?.channelName || '#notifications';
+  logger.info(`[MOCK SLACK DISPATCH] Channel: ${targetChannel} | Message: ${message}`);
 }

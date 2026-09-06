@@ -34,10 +34,11 @@ const envSchema = z.object({
   ETHEREAL_USER: z.string().optional(),
   ETHEREAL_PASSWORD: z.string().optional(),
 
-  // Slack OAuth
+  // Slack OAuth & Incoming Webhook
   SLACK_CLIENT_ID: z.string().default('mock-slack-client-id'),
   SLACK_CLIENT_SECRET: z.string().default('mock-slack-client-secret'),
   SLACK_REDIRECT_URI: z.string().default('http://localhost:3000/api/integrations/slack/callback'),
+  SLACK_WEBHOOK_URL: z.string().optional(),
 
   // Queue & Worker Concurrency / Throttling
   WORKER_CONCURRENCY: z.coerce.number().int().positive().default(5),
