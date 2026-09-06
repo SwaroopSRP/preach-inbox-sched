@@ -1,88 +1,118 @@
 # Deployment & Operations Guide
 
-This document covers production deployment, infrastructure setup, operational considerations, and keepalive configurations for **PreachInbox Sched**.
+This document covers production cloud deployment, infrastructure setup, operational considerations, and keepalive configurations for **PreachInbox Sched**.
 
 ---
 
 ## 1. Live Production Deployment
 
+The backend service is currently deployed and live on cloud infrastructure:
+
 - **Public Backend API**: [`https://preach-inbox-api.onrender.com`](https://preach-inbox-api.onrender.com)
-- **Live Health & Probe Endpoint**: [`https://preach-inbox-api.onrender.com/health`](https://preach-inbox-api.onrender.com/health)
+- **Live Health & Latency Probe**: [`https://preach-inbox-api.onrender.com/health`](https://preach-inbox-api.onrender.com/health)
 - **Live BullMQ Queue Dashboard**: [`https://preach-inbox-api.onrender.com/admin/queues/`](https://preach-inbox-api.onrender.com/admin/queues/)
+- **Live Privacy Policy**: [`https://preach-inbox-api.onrender.com/privacy-policy`](https://preach-inbox-api.onrender.com/privacy-policy)
 
 ---
 
-## 2. Infrastructure Architecture on Cloud
+## 2. Cloud Infrastructure Architecture
 
 ```text
-               +--------------------------------------------+
-               |              Render Cloud                  |
-               |                                            |
-               |  +--------------------------------------+  |
-               |  | Web Service: preach-inbox-api        |  |
-               |  | - Express API (Port 3000)            |  |
-               |  | - Embedded BullMQ Email Worker       |  |
-               |  +--------------------------------------+  |
-               |                     |                      |
-               |  +------------------v-------------------+  |
-               |  | Redis: preach-inbox-redis (Internal) |  |
-               |  +--------------------------------------+  |
-               +---------------------|----------------------+
-                                     |
-                                     v
-                       +----------------------------+
-                       |    Neon PostgreSQL Cloud   |
-                       |    Serverless Autoscaling  |
-                       +----------------------------+
+               +-------------------------------------------------------+
+               |                     Render Cloud                      |
+               |                                                       |
+               |  +-------------------------------------------------+  |
+               |  | Web Service: preach-inbox-api                   |  |
+               |  | - Express REST API (Port 3000)                  |  |
+               |  | - Embedded BullMQ Email Worker                  |  |
+               |  +-------------------------------------------------+  |
+               |                           |                           |
+               |  +------------------------v------------------------+  |
+               |  | Managed Redis: preach-inbox-redis (Internal)    |  |
+               |  +-------------------------------------------------+  |
+               +---------------------------|---------------------------+
+                             |             |             |
+                             v             v             v
+                +-----------------+  +-----------+  +------------------+
+                | Neon PostgreSQL |  | Ethereal  |  |  Elastic Cloud   |
+                | Serverless DB   |  |   SMTP    |  |  Elasticsearch   |
+                | (Source of      |  | (Sandbox  |  |  (Search Index + |
+                |  Truth)         |  |  Mailbox) |  |   Circuit Brkr)  |
+                +-----------------+  +-----------+  +------------------+
 ```
 
 ---
 
-## 3. Database Setup (Neon PostgreSQL)
+## 3. Environment Variables Reference
 
-1. Create a database on [neon.tech](https://neon.tech).
+When deploying to Render or configuring local development, ensure the following environment variables are set in the service dashboard or `.env`:
+
+| Variable Name | Required | Description | Example / Production Value |
+| :--- | :--- | :--- | :--- |
+| `PORT` | Optional | HTTP listen port (Render injects 10000 automatically) | `3000` |
+| `NODE_ENV` | Yes | Environment mode | `production` |
+| `DATABASE_URL` | Yes | PostgreSQL connection string with SSL | `postgresql://neondb_owner:***@ep-***.neon.tech/neondb?sslmode=require` |
+| `REDIS_URL` | Yes | Redis connection string (internal Render network) | `redis://red-cv7n00u3esus73c52e40:6379` |
+| `FRONTEND_URL` | Yes | Allowed CORS origin and post-auth redirect target | `http://localhost:5173` or production domain |
+| `JWT_SECRET` | Yes | Secret key used to sign session cookies | `super-secret-jwt-key` |
+| `GOOGLE_CLIENT_ID` | Yes | Google Cloud Console OAuth 2.0 Web Client ID | `716221864428-srjbiig821k2nsf1k1e814gq9fh11h7l.apps.googleusercontent.com` |
+| `GOOGLE_CLIENT_SECRET` | Yes | Google Cloud Console OAuth 2.0 Client Secret | `GOCSPX-***` |
+| `GOOGLE_REDIRECT_URI` | Yes | Google OAuth Authorized Redirect URI | `https://preach-inbox-api.onrender.com/api/auth/google/callback` |
+| `ELASTICSEARCH_URL` | Optional | Remote Elasticsearch cluster endpoint | `https://***.es.io:9243` |
+| `ELASTICSEARCH_API_KEY` | Optional | Elasticsearch cluster base64 API key | `***` |
+| `SLACK_CLIENT_ID` | Optional | Slack App OAuth Client ID | `***` |
+| `SLACK_CLIENT_SECRET` | Optional | Slack App OAuth Client Secret | `***` |
+| `SLACK_REDIRECT_URI` | Optional | Slack OAuth Redirect URI | `https://preach-inbox-api.onrender.com/api/integrations/slack/callback` |
+| `ETHEREAL_USER` | Optional | Dedicated Ethereal mailbox username | `your-account@ethereal.email` |
+| `ETHEREAL_PASSWORD` | Optional | Dedicated Ethereal mailbox password | `your-password` |
+
+---
+
+## 4. Database Setup (Neon PostgreSQL)
+
+1. Create a serverless database on [neon.tech](https://neon.tech).
 2. Copy the Connection String (ensure `?sslmode=require` is present).
 3. Push schema to Neon:
    ```bash
    cd backend
    npx prisma db push
    ```
-4. Optional: If you need to migrate existing local data to Neon:
+4. Optional: If migrating local development data to Neon:
    ```bash
    npm run db:migrate-neon
    ```
 
 ---
 
-## 4. Redis Setup (Render Managed Redis)
+## 5. Redis Setup (Render Managed Redis)
 
 1. In the [Render Dashboard](https://dashboard.render.com), click **New +** ➔ **Redis**.
 2. Name: `preach-inbox-redis`, Plan: **Free**.
 3. Copy the **Internal Redis URL** (`redis://red-xxxx:6379`).
-4. In your Web Service (`preach-inbox-api`) ➔ **Environment** tab:
+4. In the Web Service (`preach-inbox-api`) ➔ **Environment** tab:
    - Add: `REDIS_URL` = `<Internal Redis URL>`
 5. Click **Save Changes**.
 
 ---
 
-## 5. BullMQ Embedded Worker Execution
+## 6. BullMQ Embedded Worker Architecture
 
-On Render's Free tier, background worker services are not available for free (they require the paid Starter plan).
+On Render's Free tier, background worker processes are not available at $0 (they require the paid Starter plan).
 
-To deliver a **100% functional, self-contained deployment at $0 cost**:
+To deliver a **100% functional, production-grade deployment at zero cost**:
 - In [`backend/src/server.ts`](file:///home/srp/Documents/Work/Projects/preach-inbox-sched/backend/src/server.ts), the BullMQ Email Worker is automatically initialized inside the web service process.
 - The single Render web service runs **both** the Express API and the BullMQ background worker concurrently.
-- If you scale to multiple container instances or a standalone worker later, BullMQ’s distributed Redis locking seamlessly balances jobs across instances without double-sending.
+- If you scale to multiple container instances or a standalone worker later (`npm run worker`), BullMQ’s distributed Redis locking seamlessly balances jobs across instances without duplicate dispatch risk.
 
 ---
 
-## 6. Ethereal Email Configuration
+## 7. Ethereal Email Configuration
 
 The mailer supports two modes:
 
 ### Mode A: Zero-Config Auto Mode (Default)
 Leave `ETHEREAL_USER` and `ETHEREAL_PASSWORD` blank.
-- Nodemailer dynamically generates a test account at startup.
+- Nodemailer dynamically generates an ephemeral test account at boot.
 - Every email sent logs its direct web preview link (`https://ethereal.email/message/...`).
 
 ### Mode B: Dedicated Mailbox (Recommended for Demos)
@@ -98,7 +128,7 @@ Leave `ETHEREAL_USER` and `ETHEREAL_PASSWORD` blank.
 
 ---
 
-## 7. Keepalive Cron Configuration (Preventing Cold Starts)
+## 8. Keepalive Cron Configuration (Preventing Cold Starts)
 
 Render free instances spin down after 15 minutes of inactivity.
 
@@ -108,21 +138,21 @@ To keep the instance permanently warm for reviewer evaluations:
 3. Method: `GET`.
 4. Interval: **Every 10 to 14 minutes**.
 
-### Important Policy & Quota Considerations:
-- **No Account Suspension**: Pingers and uptime monitors are standard practice across the developer community. Render does not ban or suspend accounts for uptime pinging.
+### Policy & Quota Considerations:
+- **Zero Risk of Account Suspension**: Uptime monitors and pingers are standard developer practices. Render does not suspend accounts for uptime pinging.
 - **750 Free Instance Hours Limit**: Render provides 750 free instance hours per calendar month per account. A single service running continuously 24/7 consumes $24 \times 31 = 744$ hours, which stays safely within the 750-hour allowance.
 
 ---
 
-## 8. Elasticsearch Considerations (Why 0.1 CPU / 512MB RAM Fails)
+## 9. Elasticsearch Resilience & Circuit Breaker
 
 ### Technical Analysis:
-Running Elasticsearch on a 0.1 CPU / 512 MB RAM container will fail:
-1. **JVM & Lucene Memory**: Even with minimal heap (`-Xms200m -Xmx200m`), JVM Metaspace, thread stacks, and Lucene off-heap page cache require at least 800MB–1.2GB. The Linux kernel OOM Killer will kill the container (`SIGKILL / Exit 137`).
-2. **0.1 CPU Throttling**: JVM JIT compilation on 100 millicores takes 4–7 minutes to boot, triggering deployment health check timeouts.
+Running local Elasticsearch inside small free-tier containers (0.1 CPU / 512 MB RAM) is unstable:
+1. **JVM Memory Requirements**: JVM Metaspace and Lucene page cache require at least 800MB–1.2GB. Low-memory containers suffer Linux OOM Killer kills (`SIGKILL / Exit 137`).
+2. **CPU Throttling**: JVM JIT compilation on 100 millicores takes several minutes to boot.
 
-### Our Resilient Solution:
-Our codebase includes an automatic circuit breaker and transparent PostgreSQL fallback:
+### Our Solution:
+Our codebase is connected to an Elastic Cloud 9.x cluster and includes an automatic circuit breaker:
 ```typescript
 try {
   const esHits = await esSearch(userId, query);
@@ -133,13 +163,13 @@ try {
   return { source: 'postgres_fallback', count: emails.length, emails };
 }
 ```
-If you wish to attach a real Elasticsearch cluster for free, we recommend [Bonsai.io](https://bonsai.io) (free sandbox tier) and adding its URL to `ELASTICSEARCH_URL`.
+If the external cluster is unavailable or network latency spikes, the system automatically routes all search requests to PostgreSQL with zero user impact.
 
 ---
 
-## 9. Verification Scripts
+## 10. Verification Scripts
 
-The repository includes ready-to-run verification scripts in `backend/src/scripts/`:
+Run the included verification scripts inside `backend/src/scripts/`:
 
 ```bash
 cd backend
@@ -149,4 +179,7 @@ npx tsx src/scripts/test-ethereal.ts
 
 # 2. Test full end-to-end flow: DB -> BullMQ Delayed Queue -> Worker -> Ethereal
 npx tsx src/scripts/test-end-to-end-email.ts
+
+# 3. Test Elasticsearch connectivity & search query execution
+npx tsx src/scripts/test-elasticsearch.ts
 ```

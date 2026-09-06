@@ -31,7 +31,7 @@ preach-inbox-sched/
 │   │   ├── middleware/       # JWT Auth & centralized error handling
 │   │   ├── modules/          # Auth (Google OAuth), Emails, Senders, Slack OAuth
 │   │   ├── queue/            # BullMQ email queue & Bull Board adapter
-│   │   ├── scripts/          # Verification scripts (Ethereal, Neon migration)
+│   │   ├── scripts/          # Verification scripts (Ethereal, Elasticsearch, Neon migration)
 │   │   └── workers/          # BullMQ email worker & atomic Redis rate limiter
 │   └── tests/                # 24 automated unit & integration tests (Vitest)
 ├── docs/                     # Comprehensive engineering specifications & guides
@@ -138,4 +138,8 @@ npx tsx src/scripts/test-ethereal.ts
 
 # 2. Verify full lifecycle (DB -> BullMQ Delayed Queue -> Worker -> Ethereal)
 npx tsx src/scripts/test-end-to-end-email.ts
+
+# 3. Verify Elasticsearch cluster connectivity & indexing
+npx tsx src/scripts/test-elasticsearch.ts
 ```
+

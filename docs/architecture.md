@@ -1,53 +1,43 @@
 # Architecture & System Design
 
-This document details the high-level architecture, design decisions, data models, and trade-offs of the **PreachInbox Sched** backend service.
+This document provides a comprehensive technical overview of the architecture, design principles, data models, and architectural assumptions of **PreachInbox Sched**.
 
 ---
 
-## 1. High-Level Architecture
+## 1. High-Level System Architecture
 
-The system is designed as an asynchronous, event-driven email scheduling and delivery platform with strict durability, idempotency, and rate-limiting guarantees.
+PreachInbox Sched is designed as an asynchronous, event-driven email scheduling and dispatch engine built with TypeScript, Node.js, Express, BullMQ, Redis, PostgreSQL (Neon), and Elasticsearch.
 
-```text
-                             +-----------------------+
-                             |    Frontend Client    |
-                             | (React / Vite / Web)  |
-                             +-----------------------+
-                                         |
-                                         | HTTP / REST (JWT Auth)
-                                         v
-                             +-----------------------+
-                             |   Express 4.x REST    |
-                             |      API Server       |
-                             +-----------------------+
-                              /          |          \
-                             /           |           \
-                            v            v            v
-                  +------------+   +------------+   +-------------------+
-                  | PostgreSQL |   |   Redis    |   |   Elasticsearch   |
-                  |  (Neon DB) |   |  (Render)  |   | (Search Index)    |
-                  |  Source of |   | In-Memory  |   | + Fallback Engine |
-                  |   Truth    |   |    Coord   |   +-------------------+
-                  +------------+   +------------+
-                        ^                ^
-                        |                |
-                        |          +-----------+
-                        |          |  BullMQ   |
-                        |          | Delayed Q |
-                        |          +-----------+
-                        |                |
-                        |                v
-                        |         +-------------+
-                        +---------|   Worker    |
-                                  | State Mach. |
-                                  +-------------+
-                                     /       \
-                                    /         \
-                                   v           v
-                          +--------------+   +---------------+
-                          |   Ethereal   |   |  Slack OAuth  |
-                          |  SMTP Server |   | Webhook Alert |
-                          +--------------+   +---------------+
+```mermaid
+flowchart TD
+    Client[Web Frontend / React Client] -->|HTTPS / REST<br>Cookie: token=JWT| API[Express API Server<br>Port 3000]
+
+    subgraph Auth & Identity
+        API <-->|OAuth 2.0 OpenID Connect| Google[Google OAuth<br>openid, email, profile]
+    end
+
+    subgraph Primary Storage [Single Source of Truth]
+        API -->|Prisma ORM<br>Connection Pool| Postgres[(Neon PostgreSQL 16<br>User, Sender, Email, Slack)]
+    end
+
+    subgraph Job Queue & Rate Limiting
+        API -->|Delayed Job Enqueue<br>jobId = emailId| Redis[(Redis 7.x<br>Render Managed)]
+        Redis -->|BullMQ Sorted Set<br>Score = scheduledAt| QueueEngine[BullMQ Delayed Queue]
+        QueueEngine -->|Pulls Matured Jobs<br>Concurrency = 5| Worker[Email Worker<br>Embedded / Standalone]
+        Worker <-->|Atomic Lua Scripts<br>Slot Reservation| Redis
+    end
+
+    subgraph Search & Projection
+        API -->|Async Event Indexing| ES[(Elasticsearch 9.x<br>Emails Index)]
+        API -.->|Circuit Breaker Fallback| Postgres
+    end
+
+    subgraph External Delivery & Alerting
+        Worker -->|Conditional Transition<br>SCHEDULED -> PROCESSING| Postgres
+        Worker -->|SMTP Delivery| Ethereal[Ethereal SMTP<br>Sandbox + Preview URL]
+        Worker -->|Update Status<br>SENT / FAILED| Postgres
+        Worker -.->|Hourly Quota Hit<br>1-hr Deduplicated| Slack[Slack Webhook<br>chat:write]
+    end
 ```
 
 ---
@@ -56,38 +46,64 @@ The system is designed as an asynchronous, event-driven email scheduling and del
 
 | Component | Technology | Primary Responsibility | Critical Guarantees |
 | :--- | :--- | :--- | :--- |
-| **Relational Database** | PostgreSQL 16 (Neon) via Prisma ORM | System of Record | All state transitions (`SCHEDULED` → `PROCESSING` → `SENT` / `FAILED`) are atomically committed here. Multi-tenant data isolation by `userId`. |
-| **In-Memory Coordination** | Redis 7.x (Render Managed) via `ioredis` | Queue Storage & Concurrency | Stores BullMQ delayed jobs in durable sorted sets (`zset`). Powers atomic rate-limiting Lua scripts for inter-email spacing and hourly quotas. |
-| **Job Queue & Scheduling** | BullMQ 5.x | Deterministic Delayed Execution | Handles delayed execution, exponential backoff retries, and worker concurrency without cron syntax or polling loops. |
-| **Search Projection** | Elasticsearch 8.x + PostgreSQL Fallback | Text Search | Multi-match text search across `recipient`, `subject`, and `body`. Protected by an automatic circuit breaker and transparent PostgreSQL fallback. |
-| **SMTP Delivery Engine** | Nodemailer | Mail Dispatch | Safe sandbox email delivery via Ethereal SMTP with auto-generated web preview URLs. |
-| **Alerting & Notifications** | Slack OAuth 2.0 (`chat:write`) | Operational Alerts | Dispatches an alert when a sender hits their hourly limit. Rate-limited to max 1 alert per sender per hour. |
+| **Relational Database** | PostgreSQL 16 (Neon) via Prisma ORM | Single Source of Truth | Authoritative state of all user accounts, senders, and email statuses (`SCHEDULED`, `PROCESSING`, `SENT`, `FAILED`). Enforces multi-tenant data isolation via indexed `userId` foreign keys. |
+| **In-Memory Coordination** | Redis 7.x (Render) via `ioredis` | Queue Storage & Rate Limiting | Stores BullMQ delayed jobs in durable sorted sets (`zset`). Executes atomic Lua scripts for inter-email spacing reservations and hourly quotas. |
+| **Job Queue & Scheduling** | BullMQ 5.x | Deterministic Delayed Execution | Millisecond-precision scheduling backed by Redis epoch timestamps. Zero cron loops, zero database polling. |
+| **Search Engine** | Elasticsearch 9.x (Elastic Cloud) | Multi-Match Text Search | High-performance search across `recipient`, `subject`, and `body`. Ingestion is asynchronous and failure-tolerant. |
+| **Search Circuit Breaker** | PostgreSQL Fallback Engine | High Availability | If Elasticsearch is unreachable or times out, searches automatically route to PostgreSQL `ILIKE` queries with zero downtime. |
+| **SMTP Delivery Engine** | Nodemailer (Ethereal SMTP) | Mail Transmission | Dispatches emails to safe test mailboxes with auto-generated web preview links. |
+| **Alerting System** | Slack OAuth 2.0 Webhooks | Operational Alerting | Alerts team channels when a sender reaches their hourly quota ($200\text{ emails/hr}$). Rate-limited to at most 1 alert per sender per hour via Redis deduplication. |
 
 ---
 
 ## 3. Core Design Principles
 
 ### 1. PostgreSQL is the Sole Source of Truth
-Redis and Elasticsearch are treated as transient or derived stores.
-- If Redis is flushed or a worker crashes, the authoritative status of an email (`SCHEDULED`, `PROCESSING`, `SENT`, `FAILED`) is always determined by PostgreSQL.
-- If Elasticsearch is completely offline, all search queries automatically fall back to relational queries in PostgreSQL with zero downtime.
+Redis and Elasticsearch are treated as transient or derived projections:
+- If Redis restarts or is cleared, the actual state of an email is always determined by PostgreSQL.
+- If Elasticsearch goes offline, search queries seamlessly fall back to relational queries in PostgreSQL.
+- Emails are never marked as `SENT` or `FAILED` in Redis or Elasticsearch without first being committed in PostgreSQL.
 
-### 2. No Cron Jobs for Scheduling
-Cron is periodic, interval-based, and imprecise for ad-hoc user-scheduled tasks (e.g. sending at `2026-09-05T14:32:15.000Z`).
-- We use **BullMQ Delayed Jobs** backed by Redis Sorted Sets.
-- Target delay is calculated down to the millisecond: `delayMs = Math.max(0, scheduledAt.getTime() - Date.now())`.
-- Jobs remain dormant in Redis and mature precisely at the target epoch millisecond.
+### 2. Strict Avoidance of Cron for Scheduling
+Traditional email schedulers rely on periodic cron jobs (e.g. running every 1 or 5 minutes) executing `SELECT * FROM "Email" WHERE scheduledAt <= NOW()`.
+- **Why we avoid Cron**:
+  - Cron lacks millisecond precision and introduces arbitrary dispatch delays.
+  - SQL polling queries place continuous, wasteful load on relational database CPU and connection pools.
+  - Scaling worker processes with cron leads to row contention, race conditions, and deadlocks.
+- **BullMQ Delayed Jobs**:
+  - Each email is enqueued with an exact millisecond delay: `delay = Math.max(0, targetTime.getTime() - Date.now())`.
+  - Redis stores the job in a sorted set (`zset`) with the target epoch millisecond as its score.
+  - Redis wakes the worker exactly when the timestamp matures. There is **zero database polling**.
 
 ### 3. Non-Blocking Event Loops (No `sleep()`)
-Rate limiting and inter-email spacing are managed via **Redis Lua reservations** rather than `await sleep(2000)` inside worker threads.
-- Workers never block their event loops or hoard PostgreSQL connections waiting for timers to expire.
-- If an email is throttled, the worker moves the job back to BullMQ delayed state (`job.moveToDelayed()`), instantly freeing the worker thread to process other senders' emails.
+Worker threads never execute `await sleep(2000)` to throttle email dispatch rates:
+- Sleeping inside an active Node.js worker blocks the event loop, hoards concurrency slots, and exhausts database connection pools.
+- Instead, the worker executes an **atomic Redis Lua reservation script**:
+  - If a slot is available, the email dispatches immediately.
+  - If the slot is in the future, the worker reschedules the job via `job.moveToDelayed(targetTime, token)` and immediately exits the tick, freeing the thread to process emails from other senders.
+
+### 4. Real Google OAuth 2.0 with OpenID Connect
+Authentication uses real Google OAuth 2.0 OpenID Connect (`openid`, `email`, `profile`):
+- Non-sensitive scopes ensure instant login without requiring Google Cloud verification.
+- Sessions are stored in secure, `HttpOnly`, `SameSite=Lax` JWT cookies.
+- A public `/privacy-policy` endpoint satisfies Google's compliance policies.
 
 ---
 
 ## 4. Database Schema (Prisma Data Model)
 
+The database schema enforces strict relational integrity, cascade deletions, and targeted performance indexes:
+
 ```prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
 enum EmailStatus {
   SCHEDULED
   PROCESSING
@@ -170,18 +186,30 @@ model SlackConnection {
 
 ---
 
-## 5. Architectural Assumptions & Trade-offs
+## 5. Architectural Assumptions & System Boundaries
 
-1. **Dual-Write Boundary with External SMTP**:
-   - External SMTP delivery cannot participate in an ACID transaction with PostgreSQL.
-   - We mitigate this by requiring an atomic conditional update (`UPDATE "Email" SET status = 'PROCESSING' WHERE status = 'SCHEDULED'`) *before* opening the SMTP socket.
-   - If the worker process suffers a hard SIGKILL after the SMTP socket completes but before updating to `SENT`, BullMQ's lock and status guard prevent application-level duplicates.
+### 1. Dual-Write Boundary with External SMTP
+- External SMTP delivery cannot participate in an ACID transaction with PostgreSQL.
+- **Mitigation**:
+  1. The worker acquires a row-level conditional lock in PostgreSQL (`UPDATE "Email" SET status = 'PROCESSING' WHERE id = :id AND status = 'SCHEDULED'`) *before* transmitting bytes across the SMTP socket.
+  2. If the worker crashes mid-transmission, the record remains in `PROCESSING`. BullMQ's lock prevents concurrent workers from re-sending.
+  3. Upon successful SMTP receipt, the worker atomically transitions the status to `SENT`.
 
-2. **Single-Service vs Split Worker Architecture**:
-   - In production enterprise environments, the worker runs as a dedicated daemon process (`npm run worker`).
-   - On cost-constrained deployments (such as Render Free Tier), the worker is automatically run **embedded within the main web server process** (`backend/src/server.ts`).
-   - Because BullMQ is distributed and uses atomic Redis lock acquisition, whether workers run embedded or standalone, the queue execution semantics remain identical.
+### 2. Timezone Handling & Date Representation
+- **Assumption**: All timestamps stored in PostgreSQL, indexed in Elasticsearch, and transmitted across the REST API are in **ISO 8601 UTC** format (e.g. `2026-09-06T12:00:00.000Z`).
+- The frontend client is responsible for localizing UTC timestamps into the user's local timezone.
 
-3. **Elasticsearch as an Ephemeral Projection**:
-   - Elasticsearch is never treated as a source of truth. Document ingestion is strictly asynchronous and failure-tolerant (`.catch(() => {})`).
-   - A circuit breaker trips on network timeouts, redirecting search traffic directly to PostgreSQL with zero user impact.
+### 3. Rate-Limiting Windows: Discrete UTC Hour Buckets
+- Hourly limits ($200\text{ emails/hour/sender}$) use discrete UTC hour windows (`YYYY-MM-DD-HH`).
+- This design allows atomic Lua counter increments with a sliding 2-hour TTL in Redis, eliminating the high memory overhead of storing individual timestamps in sliding-window sorted sets.
+- When an hourly quota is hit, excess emails are rescheduled to the top of the next UTC hour window (zero emails are dropped).
+
+### 4. Single-Service vs Standalone Worker Architecture
+- In production, the worker can run as an isolated daemon (`npm run worker`).
+- On cost-constrained deployments (such as Render's Free tier), the worker runs **embedded inside the main web server process** (`backend/src/server.ts`).
+- Because BullMQ utilizes distributed Redis locking, running embedded or standalone maintains identical concurrency and idempotency semantics.
+
+### 5. Browser Privacy Extensions & OAuth URL Parameters
+- Browser privacy extensions (such as **ClearURLs** or Brave Shields in strict mode) strip URL parameters from Google OAuth redirects (such as `part`, `rapt`, `xsrf`), causing Google's `signin/oauth/v3/consent` endpoint to return an HTTP 400 Bad Request error.
+- Users and testers running such extensions should whitelist `accounts.google.com` or use standard browser profiles.
+- A development login bypass (`GET /api/auth/dev-login`) is also provided to enable instant, unblocked local frontend development.

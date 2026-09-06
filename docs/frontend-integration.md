@@ -1,41 +1,40 @@
 # Frontend Integration Guide
 
-This guide is designed for frontend developers building the user interface on top of the **PreachInbox Sched** backend service.
+This guide provides frontend engineers with everything needed to build a React, Next.js, or Vue client on top of the **PreachInbox Sched** API.
 
 ---
 
-## 1. Quick Setup & Configuration
+## 1. Quick Setup & Environment Configuration
 
-### Base API URLs
-- **Local Dev**: `http://localhost:3000`
-- **Production (Render)**: `https://preach-inbox-api.onrender.com`
+### API Base URLs
+| Environment | Base URL |
+| :--- | :--- |
+| **Local Development** | `http://localhost:3000` |
+| **Production (Render)** | `https://preach-inbox-api.onrender.com` |
 
-### Fetch / Axios Setup (Credentials)
-Because the backend sets an HTTP-only cookie (`token`) on login, you must include credentials with all HTTP requests:
+### Environment Variables
+Configure your frontend `.env` file:
+```env
+# Vite
+VITE_API_URL=http://localhost:3000
 
-```typescript
-// Axios instance example
-import axios from 'axios';
-
-export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000',
-  withCredentials: true, // CRITICAL: ensures cookies are sent & received
-});
+# Next.js
+NEXT_PUBLIC_API_URL=http://localhost:3000
 ```
 
-If using native `fetch()`:
-```typescript
-fetch(`${API_URL}/api/emails/scheduled`, {
-  credentials: 'include', // CRITICAL
-  headers: { 'Content-Type': 'application/json' },
-});
-```
+### Critical: Cookie Credentials
+The backend uses secure, `HttpOnly` JWT cookies named `token`. **Every HTTP request must include credentials**:
+- If using `axios`: Set `withCredentials: true`.
+- If using `fetch()`: Set `credentials: 'include'`.
+
+> [!WARNING]
+> Failing to set `withCredentials: true` or `credentials: 'include'` will cause all protected endpoints (`/api/auth/me`, `/api/emails/*`, `/api/senders`) to return an HTTP `401 Unauthorized` response.
 
 ---
 
-## 2. TypeScript Data Interfaces
+## 2. Complete TypeScript Type Definitions
 
-Copy these TypeScript interfaces into your frontend codebase (e.g. `src/types/api.ts`):
+Save this file as `src/types/api.ts` in your frontend project:
 
 ```typescript
 export type EmailStatus = 'SCHEDULED' | 'PROCESSING' | 'SENT' | 'FAILED';
@@ -49,9 +48,11 @@ export interface User {
 
 export interface Sender {
   id: string;
+  userId: string;
   email: string;
   name: string;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface Email {
@@ -67,6 +68,7 @@ export interface Email {
   failedAt?: string | null;
   errorMessage?: string | null;
   createdAt: string;
+  updatedAt: string;
   sender?: {
     id: string;
     email: string;
@@ -76,47 +78,126 @@ export interface Email {
 
 export interface ScheduleEmailPayload {
   senderId: string;
-  recipients: string[];
+  recipients: string | string[]; // Can pass single string or array of emails
   subject: string;
   body: string;
-  scheduledAt: string; // ISO 8601 string: e.g. new Date().toISOString()
-  delayMs?: number;    // Minimum 2000 (defaults to 2000)
+  scheduledAt: string;           // ISO 8601 string: e.g. new Date().toISOString()
+  delayMs?: number;              // Optional: minimum 2000 (defaults to 2000)
+  hourlyLimit?: number;          // Optional: defaults to 200
+}
+
+export interface ScheduleEmailResponse {
+  message: string;
+  emails: Email[];
+}
+
+export interface SearchEmailsResponse {
+  source: 'elasticsearch' | 'postgres_fallback';
+  count: number;
+  emails: Email[];
 }
 
 export interface SlackStatus {
   connected: boolean;
   teamName?: string | null;
   channelName?: string | null;
+  createdAt?: string | null;
+}
+
+export interface SystemHealth {
+  status: 'ok' | 'error';
+  service: string;
+  timestamp: string;
+  uptime: number;
+  connections: {
+    redis: { status: string; latencyMs: number | null };
+    database: { status: string; latencyMs: number | null };
+    bullmq: { status: string; worker: string };
+    elasticsearch: { status: string; latencyMs?: number; version?: string };
+  };
+}
+
+export interface ApiErrorDetail {
+  path: string;
+  message: string;
+}
+
+export interface ApiErrorResponse {
+  error: string;
+  details?: ApiErrorDetail[];
 }
 ```
 
 ---
 
-## 3. Implementing the Authentication Flow
+## 3. Production API Client Setup
 
-```text
-[ Login Button Clicked ] ──► Window location = "/auth/google"
-                                         │
-                                         ▼
-                            [ Google Consent Screen ]
-                                         │
-                                         ▼
-                   [ Backend Callback Sets HTTP-Only Cookie ]
-                                         │
-                                         ▼
-                  [ Redirect to Frontend Dashboard /dashboard ]
-                                         │
-                                         ▼
-                        [ Frontend calls GET /api/auth/me ]
-                                  /            \
-                                 v              v
-                       (User Authenticated)   (401 Unauthorized)
-                                                Redirect to /login
+Create `src/lib/api.ts`:
+
+```typescript
+import axios from 'axios';
+
+const BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.NEXT_PUBLIC_API_URL ||
+  'http://localhost:3000';
+
+export const api = axios.create({
+  baseURL: BASE_URL,
+  withCredentials: true, // CRITICAL: Sends and receives HTTP-only cookies
+  headers: {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  },
+});
+
+// Response interceptor for unified error formatting
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const errorData = error.response?.data;
+    const message = errorData?.error || error.message || 'An unexpected error occurred';
+    return Promise.reject(new Error(message));
+  }
+);
 ```
 
-### React Auth Hook Example:
+---
+
+## 4. Authentication Flow & React Hooks
+
+### Flow Diagram
+```text
+1. User clicks "Sign in with Google"
+   └──► window.location.href = `${API_URL}/auth/google`
+
+2. Google Consent Screen (scopes: openid, email, profile)
+   └──► User approves
+
+3. Google redirects to backend callback:
+   └──► GET /api/auth/google/callback?code=...
+   └──► Backend creates/updates User in PostgreSQL
+   └──► Backend sets HTTP-only 'token' cookie
+   └──► Backend redirects to ${FRONTEND_URL}/dashboard
+
+4. Frontend on mount calls GET /api/auth/me
+   ├── If 200 OK: Loads user profile into state
+   └── If 401 Unauthorized: Redirects to /login
+```
+
+> [!NOTE]
+> **Browser Extension Notice**: Privacy extensions like *ClearURLs* strip Google query parameters (`part`, `rapt`, `xsrf`), which triggers a Google 400 Bad Request error. Disable or whitelist `accounts.google.com`.
+
+### Development Login Bypass
+To develop or test without signing in through Google:
+- Frontend can call: `GET /api/auth/dev-login?email=test@example.com&name=TestUser`
+- Instantly sets the authentication cookie.
+
+### Complete `useAuth()` Hook
+Save as `src/hooks/useAuth.ts`:
+
 ```typescript
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '../lib/api';
 import { User } from '../types/api';
 
@@ -124,175 +205,317 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    api.get<{ user: User }>('/api/auth/me')
-      .then((res) => setUser(res.data.user))
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
+  const checkAuth = useCallback(async () => {
+    try {
+      const res = await api.get<{ user: User }>('/api/auth/me');
+      setUser(res.data.user);
+    } catch {
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   const loginWithGoogle = () => {
     window.location.href = `${api.defaults.baseURL}/auth/google`;
   };
 
-  const logout = async () => {
-    await api.post('/api/auth/logout');
-    setUser(null);
-    window.location.href = '/login';
+  const devLogin = async (email = 'srp31.swaroop@gmail.com', name = 'Swaroop (Dev)') => {
+    setLoading(true);
+    try {
+      const res = await api.get<{ user: User }>(`/api/auth/dev-login?format=json&email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}`);
+      setUser(res.data.user);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return { user, loading, loginWithGoogle, logout };
+  const logout = async () => {
+    try {
+      await api.post('/api/auth/logout');
+    } finally {
+      setUser(null);
+      window.location.href = '/login';
+    }
+  };
+
+  return {
+    user,
+    loading,
+    isAuthenticated: !!user,
+    loginWithGoogle,
+    devLogin,
+    logout,
+    refreshUser: checkAuth,
+  };
 }
 ```
 
 ---
 
-## 4. Compose & CSV Upload Implementation
+## 5. Email Management & Scheduling Hooks
 
-The `POST /api/emails/schedule` endpoint accepts a list of recipients.
-
-### Single vs CSV Batch Compose:
-The same API handles both a single recipient and thousands of CSV recipients:
+### Complete `useEmails()` Hook
+Save as `src/hooks/useEmails.ts`:
 
 ```typescript
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '../lib/api';
-import { ScheduleEmailPayload } from '../types/api';
+import { Email, ScheduleEmailPayload, ScheduleEmailResponse } from '../types/api';
 
-export async function scheduleEmailBatch(payload: ScheduleEmailPayload) {
-  const res = await api.post('/api/emails/schedule', payload);
-  return res.data;
-}
-```
+export function useEmails() {
+  const [scheduledEmails, setScheduledEmails] = useState<Email[]>([]);
+  const [sentEmails, setSentEmails] = useState<Email[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-### Parsing CSV Files in Browser:
-Use `PapaParse` or a simple string split to extract recipients on the frontend:
+  const fetchEmails = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [scheduledRes, sentRes] = await Promise.all([
+        api.get<{ emails: Email[] }>('/api/emails/scheduled'),
+        api.get<{ emails: Email[] }>('/api/emails/sent'),
+      ]);
+      setScheduledEmails(scheduledRes.data.emails);
+      setSentEmails(sentRes.data.emails);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch emails');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-```typescript
-export function parseRecipientCsv(fileContent: string): string[] {
-  return fileContent
-    .split(/[\r\n,]+/)
-    .map((email) => email.trim())
-    .filter((email) => email.includes('@') && email.includes('.'));
-}
-```
+  useEffect(() => {
+    fetchEmails();
+  }, [fetchEmails]);
 
-### Payload Example:
-```json
-{
-  "senderId": "e94e71af-7b2a-4e38-87d7-c392dd75fd61",
-  "recipients": [
-    "lead1@enterprise.com",
-    "lead2@enterprise.com",
-    "lead3@enterprise.com"
-  ],
-  "subject": "Partnership Opportunity",
-  "body": "Hi there,\n\nWe would love to discuss a partnership.",
-  "scheduledAt": "2026-09-06T10:00:00.000Z",
-  "delayMs": 2000
-}
-```
+  const scheduleBatch = async (payload: ScheduleEmailPayload): Promise<ScheduleEmailResponse> => {
+    const res = await api.post<ScheduleEmailResponse>('/api/emails/schedule', payload);
+    await fetchEmails(); // Refresh lists
+    return res.data;
+  };
 
----
-
-## 5. Scheduled & Sent Emails Views
-
-Implement your main view with two tabs:
-
-### 1. "Scheduled" Tab:
-- **API Call**: `GET /api/emails/scheduled`
-- **Fields to Display**: Recipient, Subject, Sender, Scheduled Time (`scheduledAt`), Status badge (`SCHEDULED`).
-
-### 2. "Sent" Tab:
-- **API Call**: `GET /api/emails/sent`
-- **Fields to Display**: Recipient, Subject, Sender, Delivery Timestamp (`sentAt`), Status badge (`SENT`).
-
-```typescript
-// Example fetch logic
-export async function getScheduledEmails() {
-  const { data } = await api.get<{ emails: Email[] }>('/api/emails/scheduled');
-  return data.emails;
-}
-
-export async function getSentEmails() {
-  const { data } = await api.get<{ emails: Email[] }>('/api/emails/sent');
-  return data.emails;
+  return {
+    scheduledEmails,
+    sentEmails,
+    loading,
+    error,
+    refresh: fetchEmails,
+    scheduleBatch,
+  };
 }
 ```
 
 ---
 
-## 6. Real-Time Search Bar
+## 6. Sender Management Hook
 
-Implement search using a 300ms debounce:
+### Complete `useSenders()` Hook
+Save as `src/hooks/useSenders.ts`:
+
+```typescript
+import { useState, useEffect, useCallback } from 'react';
+import { api } from '../lib/api';
+import { Sender } from '../types/api';
+
+export function useSenders() {
+  const [senders, setSenders] = useState<Sender[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchSenders = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get<{ senders: Sender[] }>('/api/senders');
+      setSenders(res.data.senders);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSenders();
+  }, [fetchSenders]);
+
+  const createSender = async (name: string, email: string) => {
+    const res = await api.post<{ sender: Sender }>('/api/senders', { name, email });
+    setSenders((prev) => [...prev, res.data.sender]);
+    return res.data.sender;
+  };
+
+  return { senders, loading, createSender, refreshSenders: fetchSenders };
+}
+```
+
+---
+
+## 7. Real-Time Search with Debouncing
+
+Search queries query Elasticsearch first and automatically fall back to PostgreSQL.
+
+### Complete `useEmailSearch()` Hook
+Save as `src/hooks/useEmailSearch.ts`:
 
 ```typescript
 import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
-import { Email } from '../types/api';
+import { Email, SearchEmailsResponse } from '../types/api';
 
-export function useEmailSearch(query: string) {
+export function useEmailSearch(query: string, debounceMs = 300) {
   const [results, setResults] = useState<Email[]>([]);
+  const [source, setSource] = useState<'elasticsearch' | 'postgres_fallback' | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
+      setSource(null);
       return;
     }
 
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const { data } = await api.get<{ emails: Email[]; source: string }>(
-          `/api/emails/search?q=${encodeURIComponent(query)}`
+        const res = await api.get<SearchEmailsResponse>(
+          `/api/emails/search?q=${encodeURIComponent(query.trim())}`
         );
-        setResults(data.emails);
+        setResults(res.data.emails);
+        setSource(res.data.source);
+      } catch {
+        setResults([]);
       } finally {
         setLoading(false);
       }
-    }, 300);
+    }, debounceMs);
 
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, debounceMs]);
 
-  return { results, loading };
+  return { results, source, loading };
 }
 ```
 
 ---
 
-## 7. Slack Alert Integration Widget
+## 8. CSV Parsing & Upload Helper
 
-Display Slack connection status in your user settings:
+Users can schedule thousands of emails by uploading a CSV. This helper extracts, validates, and deduplicates emails directly in the browser before sending:
 
-1. On load, call `GET /api/integrations/slack/status`.
-2. If `connected === false`:
-   - Display a **"Connect Slack"** button.
-   - On click, navigate: `window.location.href = `${api.defaults.baseURL}/api/integrations/slack/connect``.
-3. If `connected === true`:
-   - Display: **"Connected to [teamName] ([channelName])"**.
-   - Display a **"Disconnect"** button which calls `POST /api/integrations/slack/disconnect`.
+Save as `src/utils/csv.ts`:
 
----
+```typescript
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
-## 8. Error Handling Guidelines
+export interface CsvParseResult {
+  validEmails: string[];
+  invalidCount: number;
+  totalCount: number;
+}
 
-All validation errors from the backend return HTTP 400 with a structured `details` array:
+export function parseRecipientCsv(fileContent: string): CsvParseResult {
+  const lines = fileContent.split(/[\r\n,]+/);
+  const validSet = new Set<string>();
+  let invalidCount = 0;
 
-```json
-{
-  "error": "Validation Error",
-  "details": [
-    {
-      "path": "recipients.0",
-      "message": "Each recipient must be a valid email"
-    },
-    {
-      "path": "scheduledAt",
-      "message": "Scheduled time must be in the future"
+  for (const raw of lines) {
+    const trimmed = raw.trim().replace(/^["']|["']$/g, '');
+    if (!trimmed) continue;
+
+    if (EMAIL_REGEX.test(trimmed)) {
+      validSet.add(trimmed.toLowerCase());
+    } else {
+      invalidCount++;
     }
-  ]
+  }
+
+  const validEmails = Array.from(validSet);
+  return {
+    validEmails,
+    invalidCount,
+    totalCount: validEmails.length + invalidCount,
+  };
 }
 ```
 
-Map these paths directly to form field error helpers in React!
+---
+
+## 9. Slack Alerts Integration Hook
+
+Save as `src/hooks/useSlack.ts`:
+
+```typescript
+import { useState, useEffect, useCallback } from 'react';
+import { api } from '../lib/api';
+import { SlackStatus } from '../types/api';
+
+export function useSlack() {
+  const [status, setStatus] = useState<SlackStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchStatus = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get<SlackStatus>('/api/integrations/slack/status');
+      setStatus(res.data);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStatus();
+  }, [fetchStatus]);
+
+  const connect = () => {
+    window.location.href = `${api.defaults.baseURL}/api/integrations/slack/connect`;
+  };
+
+  const disconnect = async () => {
+    await api.post('/api/integrations/slack/disconnect');
+    setStatus({ connected: false });
+  };
+
+  return { status, loading, connect, disconnect, refreshStatus: fetchStatus };
+}
+```
+
+---
+
+## 10. Dashboard UI Layout & Wireframe Blueprint
+
+Frontend developers can follow this structural layout for high usability:
+
+```text
++-------------------------------------------------------------------------+
+| [Logo] PreachInbox Sched     [Search Input (q)]     [Health: OK] [Avatar]
++-------------------------------------------------------------------------+
+|                                                                         |
+|  +-------------------------------------------------------------------+  |
+|  | Actions: [+ Schedule Email]   [+ Add Sender]   [Slack: Connected] |  |
+|  +-------------------------------------------------------------------+  |
+|                                                                         |
+|  [ Scheduled Emails (23) ]        [ Sent Emails (1,240) ]               |
+|  +-------------------------------------------------------------------+  |
+|  | Recipient         | Subject          | Sender     | Scheduled At  |  |
+|  |-------------------+------------------+------------+---------------|  |
+|  | alex@company.com  | Q3 Introduction  | Outreach   | In 12 minutes |  |
+|  | sam@acme.org      | Demo Follow-up   | Sales Team | Tomorrow 9 AM |  |
+|  +-------------------------------------------------------------------+  |
++-------------------------------------------------------------------------+
+```
+
+### Compose Modal Fields:
+1. **Sender Identity**: Dropdown populated via `useSenders()`.
+2. **Recipients**:
+   - Tag input for typing individual email addresses.
+   - Drag-and-drop CSV file dropzone triggering `parseRecipientCsv()`. Shows preview badge: `✓ 450 valid recipients parsed`.
+3. **Subject**: Text input (`min 1 char`).
+4. **Body**: Multi-line textarea or rich text editor.
+5. **Scheduled Time**:
+   - "Send Now" button (sets `scheduledAt = new Date().toISOString()`).
+   - "Schedule for Later" datetime picker (converts local selection to UTC ISO string: `date.toISOString()`).
+6. **Submit**: Calls `scheduleBatch({ senderId, recipients, subject, body, scheduledAt })`.
