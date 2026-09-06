@@ -71,7 +71,7 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     loadEmails();
-    const interval = setInterval(loadEmails, 12000); // Polling every 12s
+    const interval = setInterval(loadEmails, 3000); // Polling every 3s for immediate updates
     return () => clearInterval(interval);
   }, [loadEmails]);
 
@@ -100,6 +100,8 @@ const Dashboard: React.FC = () => {
   const handleTabChange = (tab: ActiveTab) => {
     setActiveTab(tab);
     setSelectedEmail(null);
+    setFilter('all');
+    loadEmails();
   };
 
   const handleOpenCompose = () => {

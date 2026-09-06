@@ -218,7 +218,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({ onBack, onEmailSched
     setLoading(true);
 
     try {
-      const scheduledTime = scheduledDate || new Date(Date.now() + 5000).toISOString();
+      const scheduledTime = scheduledDate || new Date(Date.now() + 500).toISOString();
 
       const payload: ScheduleEmailPayload = {
         senderId: selectedSenderId,

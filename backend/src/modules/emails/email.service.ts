@@ -90,14 +90,17 @@ export async function listSentEmails(userId: string) {
   return prisma.email.findMany({
     where: {
       userId,
-      status: 'SENT',
+      status: { in: ['SENT', 'FAILED'] },
     },
     include: {
       sender: {
         select: { id: true, email: true, name: true },
       },
     },
-    orderBy: { sentAt: 'desc' },
+    orderBy: [
+      { sentAt: 'desc' },
+      { createdAt: 'desc' },
+    ],
   });
 }
 
