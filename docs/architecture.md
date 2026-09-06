@@ -82,11 +82,11 @@ Worker threads never execute `await sleep(2000)` to throttle email dispatch rate
   - If a slot is available, the email dispatches immediately.
   - If the slot is in the future, the worker reschedules the job via `job.moveToDelayed(targetTime, token)` and immediately exits the tick, freeing the thread to process emails from other senders.
 
-### 4. Real Google OAuth 2.0 with OpenID Connect
-Authentication uses real Google OAuth 2.0 OpenID Connect (`openid`, `email`, `profile`):
-- Non-sensitive scopes ensure instant login without requiring Google Cloud verification.
-- Sessions are stored in secure, `HttpOnly`, `SameSite=Lax` JWT cookies.
-- A public `/privacy-policy` endpoint satisfies Google's compliance policies.
+### 4. Dual Authentication Architecture (Google OAuth 2.0 & Email/Password)
+The backend supports two authentication mechanisms, issuing unified JWT session cookies:
+- **Google OAuth 2.0 OpenID Connect** (`openid`, `email`, `profile`): Instant zero-config browser login. Non-sensitive scopes avoid verification requirements.
+- **Traditional Email & Password**: Registration (`POST /api/auth/register`) and login (`POST /api/auth/login`) secured with `bcryptjs` (10 salt rounds).
+- Both mechanisms automatically provision a verified default `Sender` identity and set secure `HttpOnly; SameSite=Lax` cookies.
 
 ---
 
@@ -117,6 +117,7 @@ model User {
   name            String
   avatar          String?
   googleId        String?          @unique
+  password        String?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 

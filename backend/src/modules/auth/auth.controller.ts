@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as authService from './auth.service.js';
+import { registerSchema, loginSchema } from './auth.schema.js';
 import { env } from '../../config/env.js';
 
 export async function googleLoginHandler(_req: Request, res: Response, next: NextFunction) {
@@ -209,3 +210,48 @@ export async function logoutHandler(_req: Request, res: Response) {
   res.clearCookie('token');
   res.json({ success: true, message: 'Logged out successfully' });
 }
+
+export async function registerHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const validated = registerSchema.parse(req.body);
+    const { user, token } = await authService.registerUser(validated);
+
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.status(201).json({
+      message: 'Registration successful',
+      user,
+      token,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function loginHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const validated = loginSchema.parse(req.body);
+    const { user, token } = await authService.loginUser(validated);
+
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.json({
+      message: 'Login successful',
+      user,
+      token,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+

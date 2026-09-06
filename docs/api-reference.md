@@ -117,6 +117,65 @@ Google OAuth redirect callback. Exchanges the authorization code for Google acce
     }
     ```
 
+### `POST /api/auth/register` (Alias: `POST /auth/register`)
+Registers a new user account with traditional email and password, creates an initial default Sender identity, and issues an authenticated session cookie.
+- **Auth Required**: None.
+- **HTTP Method**: `POST`
+- **Request Body**:
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "SecurePassword123!",
+    "name": "Jane Doe"
+  }
+  ```
+- **Validation Rules**:
+  - `email` (string, required): Valid email address.
+  - `password` (string, required): Minimum 6 characters. Hashed via `bcryptjs` (10 rounds).
+  - `name` (string, required): Minimum 1 character.
+- **Response `201 Created`**:
+  - Sets cookie: `token=<jwt>; HttpOnly; Path=/; SameSite=Lax; Max-Age=604800`.
+  ```json
+  {
+    "message": "Registration successful",
+    "user": {
+      "id": "3744bfcc-ed08-49d4-a3da-64fc5720da26",
+      "email": "user@example.com",
+      "name": "Jane Doe",
+      "avatar": null
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+  }
+  ```
+- **Response `409 Conflict`**: If an account with this email already exists.
+
+### `POST /api/auth/login` (Alias: `POST /auth/login`)
+Authenticates an existing user using email and password, issuing an authenticated session cookie.
+- **Auth Required**: None.
+- **HTTP Method**: `POST`
+- **Request Body**:
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "SecurePassword123!"
+  }
+  ```
+- **Response `200 OK`**:
+  - Sets cookie: `token=<jwt>; HttpOnly; Path=/; SameSite=Lax; Max-Age=604800`.
+  ```json
+  {
+    "message": "Login successful",
+    "user": {
+      "id": "3744bfcc-ed08-49d4-a3da-64fc5720da26",
+      "email": "user@example.com",
+      "name": "Jane Doe",
+      "avatar": null
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+  }
+  ```
+- **Response `401 Unauthorized`**: If password is wrong, email does not exist, or account was created with Google OAuth only.
+
 ### `GET /api/auth/dev-login`
 Development and testing authentication bypass. Creates or logs into a test user account and sets the JWT session cookie immediately without needing external Google credentials.
 - **Auth Required**: None.

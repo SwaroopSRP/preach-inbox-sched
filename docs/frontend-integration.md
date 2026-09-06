@@ -224,6 +224,35 @@ export function useAuth() {
     window.location.href = `${api.defaults.baseURL}/auth/google`;
   };
 
+  const loginWithPassword = async (email: string, password: string) => {
+    setLoading(true);
+    try {
+      const res = await api.post<{ user: User; message: string }>('/api/auth/login', {
+        email,
+        password,
+      });
+      setUser(res.data.user);
+      return res.data;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const registerWithPassword = async (name: string, email: string, password: string) => {
+    setLoading(true);
+    try {
+      const res = await api.post<{ user: User; message: string }>('/api/auth/register', {
+        name,
+        email,
+        password,
+      });
+      setUser(res.data.user);
+      return res.data;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const devLogin = async (email = 'srp31.swaroop@gmail.com', name = 'Swaroop (Dev)') => {
     setLoading(true);
     try {
@@ -248,6 +277,8 @@ export function useAuth() {
     loading,
     isAuthenticated: !!user,
     loginWithGoogle,
+    loginWithPassword,
+    registerWithPassword,
     devLogin,
     logout,
     refreshUser: checkAuth,

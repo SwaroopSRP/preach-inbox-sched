@@ -33,7 +33,7 @@ preach-inbox-sched/
 │   │   ├── queue/            # BullMQ email queue & Bull Board adapter
 │   │   ├── scripts/          # Verification scripts (Ethereal, Elasticsearch, Neon migration)
 │   │   └── workers/          # BullMQ email worker & atomic Redis rate limiter
-│   └── tests/                # 24 automated unit & integration tests (Vitest)
+│   └── tests/                # 32 automated unit & integration tests (Vitest)
 ├── docs/                     # Comprehensive engineering specifications & guides
 │   ├── architecture.md       # High-level architecture, data models & design trade-offs
 │   ├── scheduling-and-queues.md # BullMQ delayed jobs, restart durability & idempotency
@@ -79,6 +79,7 @@ To ensure high maintainability and ease of assessment, the documentation is divi
 | **Slack Rate-Limit Alerting** | Slack OAuth 2.0 Webhook Integration | Automatically alerts a designated Slack channel when a sender hits their limit. Deduplicated to max 1 notification per sender per hour. |
 | **Safe Mailbox Sandbox** | Ethereal SMTP via Nodemailer | Dispatches to safe test mailboxes and generates live HTML/plain-text preview URLs. |
 | **Search Engine & Fallback** | Elasticsearch + PostgreSQL Fallback | Multi-match search across recipient, subject, and body. Automatic circuit breaker falls back to PostgreSQL relational search if Elasticsearch is offline. |
+| **Dual Authentication** | Google OAuth 2.0 + Email/Password | Real Google OAuth OpenID Connect (`openid`, `email`, `profile`) and traditional Email/Password with `bcryptjs` hashing. Both issue unified HTTP-only JWT cookies. |
 
 ---
 
@@ -108,7 +109,7 @@ npm run db:generate
 ```
 
 ### 3. Run Automated Tests
-The test suite contains 24 end-to-end and unit tests verifying queues, worker state machines, concurrency locks, restart persistence, and rate-limiting:
+The test suite contains 32 end-to-end and unit tests across 10 suites verifying authentication, queues, worker state machines, concurrency locks, restart persistence, and rate-limiting:
 ```bash
 npm test
 ```

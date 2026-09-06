@@ -1,8 +1,11 @@
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import { OAuth2Client } from 'google-auth-library';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
 import { logger } from '../../lib/logger.js';
+import { AppError } from '../../middleware/error.middleware.js';
+import { RegisterInput, LoginInput } from './auth.schema.js';
 
 export interface GoogleUserProfile {
   googleId: string;
@@ -158,3 +161,84 @@ export function generateJwtToken(user: { id: string; email: string; name: string
     { expiresIn: '7d' }
   );
 }
+
+export async function registerUser(input: RegisterInput) {
+  const existing = await prisma.user.findUnique({
+    where: { email: input.email },
+  });
+
+  if (existing) {
+    throw new AppError(409, 'An account with this email address already exists');
+  }
+
+  const hashedPassword = await bcrypt.hash(input.password, 10);
+
+  const user = await prisma.user.create({
+    data: {
+      email: input.email,
+      name: input.name,
+      password: hashedPassword,
+    },
+  });
+
+  // Ensure default Sender identity exists
+  await prisma.sender.upsert({
+    where: {
+      userId_email: {
+        userId: user.id,
+        email: user.email,
+      },
+    },
+    update: {},
+    create: {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+    },
+  });
+
+  const token = generateJwtToken(user);
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      avatar: user.avatar,
+    },
+    token,
+  };
+}
+
+export async function loginUser(input: LoginInput) {
+  const user = await prisma.user.findUnique({
+    where: { email: input.email },
+  });
+
+  if (!user) {
+    throw new AppError(401, 'Invalid email or password');
+  }
+
+  if (!user.password) {
+    throw new AppError(
+      401,
+      'This account was created using Google OAuth. Please sign in with Google.'
+    );
+  }
+
+  const isMatch = await bcrypt.compare(input.password, user.password);
+  if (!isMatch) {
+    throw new AppError(401, 'Invalid email or password');
+  }
+
+  const token = generateJwtToken(user);
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      avatar: user.avatar,
+    },
+    token,
+  };
+}
+
