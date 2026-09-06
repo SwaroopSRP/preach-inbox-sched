@@ -59,7 +59,7 @@ export function createApp(): Express {
     let redisLatencyMs: number | null = null;
     try {
       const start = Date.now();
-      const pong = await withTimeout(redis.ping(), 1500, 'TIMEOUT');
+      const pong = await withTimeout(redis.ping(), 4000, 'TIMEOUT');
       if (pong === 'PONG') {
         redisStatus = 'connected';
         redisLatencyMs = Date.now() - start;
@@ -74,7 +74,7 @@ export function createApp(): Express {
     let dbLatencyMs: number | null = null;
     try {
       const start = Date.now();
-      const result = await withTimeout(prisma.$queryRaw`SELECT 1`, 1500, null);
+      const result = await withTimeout(prisma.$queryRaw`SELECT 1`, 4000, null);
       if (result !== null) {
         dbStatus = 'connected';
         dbLatencyMs = Date.now() - start;
@@ -90,7 +90,7 @@ export function createApp(): Express {
 
     const esPing = await withTimeout(
       pingElasticsearch(),
-      1500,
+      4000,
       { connected: false, error: 'probe_timeout' }
     );
 

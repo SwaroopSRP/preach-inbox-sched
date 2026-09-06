@@ -1,15 +1,21 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { emailQueue, enqueueEmailJob } from '../src/queue/email.queue.js';
-import { createEmailWorker } from '../src/workers/email.worker.js';
+import { Queue, Worker } from 'bullmq';
+import { createRedisConnection } from '../src/lib/redis.js';
 
 describe('BullMQ Delayed Jobs & Restart Persistence', () => {
+  const queueConnection = createRedisConnection('queue');
+  const workerConnection = createRedisConnection('worker');
+  const testQueueName = 'test-restart-queue';
+  const testQueue = new Queue(testQueueName, { connection: queueConnection });
   const cleanupWorkers: Array<{ close: () => Promise<void> }> = [];
 
   afterAll(async () => {
     for (const w of cleanupWorkers) {
       await w.close();
     }
-    await emailQueue.close();
+    await testQueue.close();
+    await queueConnection.quit();
+    await workerConnection.quit();
   });
 
   it('preserves delayed jobs in Redis even when workers are offline, and executes when worker restarts', async () => {
@@ -17,7 +23,7 @@ describe('BullMQ Delayed Jobs & Restart Persistence', () => {
     const delayMs = 1500;
 
     // 1. Enqueue job before worker exists
-    const job = await enqueueEmailJob(emailId, delayMs);
+    const job = await testQueue.add('send-email', { emailId }, { jobId: emailId, delay: delayMs });
     expect(job.id).toBe(emailId);
 
     // 2. Verify state is delayed in Redis
@@ -29,11 +35,15 @@ describe('BullMQ Delayed Jobs & Restart Persistence', () => {
 
     // 4. Start worker after the delay has passed (simulating server/worker restart)
     let processedId = '';
-    const worker = createEmailWorker(async (j) => {
-      if (j.data.emailId === emailId) {
-        processedId = j.data.emailId;
-      }
-    });
+    const worker = new Worker(
+      testQueueName,
+      async (j) => {
+        if (j.data.emailId === emailId) {
+          processedId = j.data.emailId;
+        }
+      },
+      { connection: workerConnection }
+    );
     cleanupWorkers.push(worker);
 
     // Give worker time to pick up and process matured delayed job
