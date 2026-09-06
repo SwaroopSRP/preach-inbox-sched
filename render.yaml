@@ -4,6 +4,13 @@ services:
     name: preach-inbox-api
     runtime: node
     rootDir: backend
+    buildFilter:
+      paths:
+        - backend/**
+      ignoredPaths:
+        - frontend/**
+        - docs/**
+        - README.md
     buildCommand: npm install --include=dev && npx prisma generate && npm run build
     startCommand: npm start
     plan: free
@@ -49,6 +56,13 @@ services:
     name: preach-inbox-worker
     runtime: node
     rootDir: backend
+    buildFilter:
+      paths:
+        - backend/**
+      ignoredPaths:
+        - frontend/**
+        - docs/**
+        - README.md
     buildCommand: npm install --include=dev && npx prisma generate && npm run build
     startCommand: npm run start:worker
     plan: free

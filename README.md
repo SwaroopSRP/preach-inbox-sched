@@ -62,7 +62,10 @@ To ensure high maintainability and ease of assessment, the documentation is divi
 4. **[Frontend Integration Guide](docs/frontend-integration.md)**
    *Step-by-step instructions for frontend engineers: TypeScript types, Google OAuth session handling with HTTP-only cookies, CSV recipient parsing, Scheduled vs. Sent tabs, search debouncing, and Slack connection widgets.*
 
-5. **[Deployment & Cloud Operations Guide](docs/deployment-and-operations.md)**
+5. **[Vercel Deployment & Render Isolation Guide](docs/vercel-deployment.md)**
+   *Production deployment instructions for Vercel, single-page application rewrites (`vercel.json`), and Render `buildFilter` configuration preventing backend rebuilds on frontend updates.*
+
+6. **[Deployment & Cloud Operations Guide](docs/deployment-and-operations.md)**
    *Live Render deployment details, Neon serverless PostgreSQL setup, Render Managed Redis, Ethereal SMTP mailbox options, keepalive cron setup (safely preventing cold starts within the 750h limit), and Elasticsearch considerations.*
 
 ---
@@ -124,6 +127,14 @@ npm run worker
 ```
 
 *Note: In production on Render, the worker is automatically embedded within the main web server process for zero-cost single-instance execution.*
+
+### 5. Run Frontend Dashboard
+```bash
+cd ../frontend
+npm install
+npm run dev
+```
+Open [`http://localhost:5173`](http://localhost:5173) in your browser. The frontend Vite server automatically proxies requests to the backend on `http://localhost:3000`.
 
 ---
 
