@@ -41,6 +41,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { user, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [slackStatus, setSlackStatus] = useState<SlackStatus | null>(null);
+  const [avatarError, setAvatarError] = useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -78,14 +79,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="w-full flex items-center justify-between p-2 rounded-2xl bg-surface-pill dark:bg-surface-darkInput hover:bg-gray-200/70 dark:hover:bg-surface-darkInput/80 transition-all cursor-pointer border border-transparent dark:border-surface-darkBorder"
           >
             <div className="flex items-center gap-2.5 min-w-0">
-              {user?.avatar ? (
+              {user?.avatar && !avatarError ? (
                 <img
                   src={user.avatar}
                   alt={user.name}
-                  className="w-8 h-8 rounded-full object-cover border border-gray-300 dark:border-gray-600 flex-shrink-0"
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                  onError={() => setAvatarError(true)}
+                  className="w-8 h-8 rounded-full object-cover border border-gray-300 dark:border-gray-600 flex-shrink-0 shadow-xs"
                 />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold text-xs flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-emerald-600 dark:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center flex-shrink-0 shadow-xs">
                   {user?.name?.charAt(0).toUpperCase() || 'U'}
                 </div>
               )}
@@ -100,6 +104,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
           </button>
+
 
           {/* User Dropdown Menu - ONLY Slack Connect & Sign Out */}
           {dropdownOpen && (

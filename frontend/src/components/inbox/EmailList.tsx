@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Email } from '../../types/api';
-import { Clock, Star, Mail, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Clock, Star, Mail, AlertTriangle, ArrowRight, Search } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 interface EmailListProps {
@@ -12,6 +12,7 @@ interface EmailListProps {
   starredIds: Set<string>;
   onToggleStar: (id: string) => void;
   isFilterActive?: boolean;
+  searchQuery?: string;
 }
 
 export const EmailList: React.FC<EmailListProps> = ({
@@ -23,6 +24,7 @@ export const EmailList: React.FC<EmailListProps> = ({
   starredIds,
   onToggleStar,
   isFilterActive = false,
+  searchQuery,
 }) => {
   const formatScheduledBadge = (dateStr: string) => {
     try {
@@ -57,6 +59,22 @@ export const EmailList: React.FC<EmailListProps> = ({
   }
 
   if (emails.length === 0) {
+    if (searchQuery && searchQuery.trim()) {
+      return (
+        <div className="h-[60vh] flex flex-col items-center justify-center text-center p-6 select-none animate-fadeIn">
+          <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-surface-darkInput flex items-center justify-center text-gray-400 dark:text-gray-500 mb-4 border border-gray-200 dark:border-surface-darkBorder">
+            <Search className="w-7 h-7" />
+          </div>
+          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">
+            No results found for &ldquo;{searchQuery}&rdquo;
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm">
+            Check for spelling mistakes or try searching by recipient email, subject line, or keywords in the email body.
+          </p>
+        </div>
+      );
+    }
+
     if (isFilterActive) {
       return (
         <div className="h-[60vh] flex flex-col items-center justify-center text-center p-6 select-none animate-fadeIn">
@@ -72,6 +90,7 @@ export const EmailList: React.FC<EmailListProps> = ({
         </div>
       );
     }
+
 
     return (
       <div className="h-[60vh] flex flex-col items-center justify-center text-center p-6 select-none">

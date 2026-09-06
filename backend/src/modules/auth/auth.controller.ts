@@ -136,7 +136,8 @@ export async function devLoginHandler(req: Request, res: Response, next: NextFun
   try {
     const email = (req.query.email as string) || 'srp31.swaroop@gmail.com';
     const name = (req.query.name as string) || 'Swaroop (Dev)';
-    const avatar = 'https://lh3.googleusercontent.com/a/default-user';
+    const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=059669&color=fff&bold=true`;
+
 
     const user = await authService.upsertGoogleUser({
       googleId: 'google-dev-' + email,

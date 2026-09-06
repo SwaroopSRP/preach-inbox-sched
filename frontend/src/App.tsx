@@ -47,7 +47,7 @@ const Dashboard: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Email[] | null>(null);
+  const [searchServerResults, setSearchServerResults] = useState<{ query: string; emails: Email[] } | null>(null);
   const [, startTransition] = useTransition();
 
   // Load emails
@@ -77,21 +77,22 @@ const Dashboard: React.FC = () => {
 
   // Real-time search with debounce
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults(null);
+    const q = searchQuery.trim();
+    if (!q) {
+      setSearchServerResults(null);
       return;
     }
 
     const timer = setTimeout(async () => {
       try {
-        const res = await api.emails.search(searchQuery.trim());
+        const res = await api.emails.search(q);
         startTransition(() => {
-          setSearchResults(res.emails);
+          setSearchServerResults({ query: q, emails: res.emails });
         });
       } catch (err) {
         console.error('Search failed:', err);
       }
-    }, 280);
+    }, 250);
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
@@ -106,17 +107,58 @@ const Dashboard: React.FC = () => {
     setSelectedEmail(null);
   };
 
-  const baseEmails = searchResults
-    ? searchResults.filter((e) =>
-        activeTab === 'scheduled' ? e.status === 'SCHEDULED' : e.status === 'SENT' || e.status === 'FAILED'
-      )
-    : activeTab === 'scheduled'
-    ? scheduledEmails
-    : sentEmails;
+  const currentTabEmails = activeTab === 'scheduled' ? scheduledEmails : sentEmails;
 
-  const displayedEmails = filter === 'starred'
-    ? baseEmails.filter((e) => starredIds.has(e.id))
-    : baseEmails;
+  // Real-time fused search: instant client filter + validated server results
+  const displayedEmails = (() => {
+    const q = searchQuery.toLowerCase().trim();
+
+    if (!q) {
+      return filter === 'starred'
+        ? currentTabEmails.filter((e) => starredIds.has(e.id))
+        : currentTabEmails;
+    }
+
+    // 1. Instant client-side match for zero latency
+    const localMatches = currentTabEmails.filter((e) => {
+      const rec = e.recipient?.toLowerCase() || '';
+      const sub = e.subject?.toLowerCase() || '';
+      const body = e.body?.toLowerCase() || '';
+      const sName = e.sender?.name?.toLowerCase() || '';
+      const sEmail = e.sender?.email?.toLowerCase() || '';
+      return (
+        rec.includes(q) ||
+        sub.includes(q) ||
+        body.includes(q) ||
+        sName.includes(q) ||
+        sEmail.includes(q)
+      );
+    });
+
+    const combinedMap = new Map<string, Email>();
+    localMatches.forEach((e) => combinedMap.set(e.id, e));
+
+    // 2. Only merge server results if they strictly match the CURRENT active query
+    if (searchServerResults && searchServerResults.query.toLowerCase().trim() === q) {
+      searchServerResults.emails.forEach((e) => {
+        const tabMatch =
+          activeTab === 'scheduled'
+            ? e.status === 'SCHEDULED'
+            : e.status === 'SENT' || e.status === 'FAILED';
+        if (tabMatch) {
+          combinedMap.set(e.id, e);
+        }
+      });
+    }
+
+    let list = Array.from(combinedMap.values());
+    if (filter === 'starred') {
+      list = list.filter((e) => starredIds.has(e.id));
+    }
+
+    return list;
+  })();
+
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-white dark:bg-surface-dark transition-colors font-sans">
@@ -170,6 +212,7 @@ const Dashboard: React.FC = () => {
                 starredIds={starredIds}
                 onToggleStar={toggleStar}
                 isFilterActive={filter === 'starred'}
+                searchQuery={searchQuery}
               />
             </main>
           </>

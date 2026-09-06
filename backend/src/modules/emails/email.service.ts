@@ -119,36 +119,69 @@ export async function getEmailById(emailId: string, userId: string) {
 }
 
 export async function searchEmails(userId: string, query: string) {
-  try {
-    const esHits = await esSearch(userId, query);
+  const trimmed = query.trim();
+  if (!trimmed) {
     return {
-      source: 'elasticsearch',
-      count: esHits.length,
-      emails: esHits,
+      source: 'empty',
+      count: 0,
+      emails: [],
+    };
+  }
+
+  // 1. Relational search with case-insensitive partial substring match across recipient, subject, body, sender
+  const pgEmails = await prisma.email.findMany({
+    where: {
+      userId,
+      OR: [
+        { recipient: { contains: trimmed, mode: 'insensitive' } },
+        { subject: { contains: trimmed, mode: 'insensitive' } },
+        { body: { contains: trimmed, mode: 'insensitive' } },
+        { sender: { name: { contains: trimmed, mode: 'insensitive' } } },
+        { sender: { email: { contains: trimmed, mode: 'insensitive' } } },
+      ],
+    },
+    include: {
+      sender: {
+        select: { id: true, email: true, name: true },
+      },
+    },
+    orderBy: { scheduledAt: 'desc' },
+  });
+
+  // 2. Also query Elasticsearch if available for fuzzy/indexed matching
+  try {
+    const esHits = await esSearch(userId, trimmed);
+    const emailMap = new Map(pgEmails.map((e) => [e.id, e]));
+
+    for (const hit of esHits) {
+      if (!emailMap.has(hit.id)) {
+        const fullEmail = await prisma.email.findUnique({
+          where: { id: hit.id },
+          include: {
+            sender: {
+              select: { id: true, email: true, name: true },
+            },
+          },
+        });
+        if (fullEmail) {
+          emailMap.set(fullEmail.id, fullEmail);
+        }
+      }
+    }
+
+    const combined = Array.from(emailMap.values());
+    return {
+      source: 'elasticsearch_and_postgres',
+      count: combined.length,
+      emails: combined,
     };
   } catch (err) {
-    logger.warn('Falling back to PostgreSQL relational search because Elasticsearch query failed');
-    const emails = await prisma.email.findMany({
-      where: {
-        userId,
-        OR: [
-          { recipient: { contains: query, mode: 'insensitive' } },
-          { subject: { contains: query, mode: 'insensitive' } },
-          { body: { contains: query, mode: 'insensitive' } },
-        ],
-      },
-      include: {
-        sender: {
-          select: { id: true, email: true, name: true },
-        },
-      },
-      orderBy: { scheduledAt: 'desc' },
-    });
-
+    logger.warn('Falling back strictly to PostgreSQL relational search');
     return {
       source: 'postgres_fallback',
-      count: emails.length,
-      emails,
+      count: pgEmails.length,
+      emails: pgEmails,
     };
   }
 }
+

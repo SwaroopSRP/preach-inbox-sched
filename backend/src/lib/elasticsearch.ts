@@ -140,22 +140,46 @@ export async function searchEmails(userId: string, query: string): Promise<Email
     throw new Error('Elasticsearch circuit breaker is open (offline)');
   }
 
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
   try {
     await initElasticsearchIndex();
+    const sanitized = trimmed.replace(/[+\-=!(){}[\]^"~*?:\\/]/g, ' ').trim();
     const response = await esClient.search<EmailSearchDocument>({
       index: env.ELASTICSEARCH_INDEX,
       query: {
         bool: {
           filter: [{ term: { userId } }],
-          must: [
+          should: [
             {
               multi_match: {
-                query,
-                fields: ['recipient^2', 'subject^2', 'body'],
+                query: trimmed,
+                fields: ['recipient^3', 'subject^2', 'body'],
+                type: 'phrase_prefix',
+              },
+            },
+            {
+              multi_match: {
+                query: trimmed,
+                fields: ['recipient^3', 'subject^2', 'body'],
                 fuzziness: 'AUTO',
               },
             },
+            ...(sanitized
+              ? [
+                  {
+                    query_string: {
+                      query: `*${sanitized}*`,
+                      fields: ['recipient^3', 'subject^2', 'body'],
+                      default_operator: 'AND' as const,
+                      analyze_wildcard: true,
+                    },
+                  },
+                ]
+              : []),
           ],
+          minimum_should_match: 1,
         },
       },
     });
@@ -167,3 +191,4 @@ export async function searchEmails(userId: string, query: string): Promise<Email
     throw err;
   }
 }
+
