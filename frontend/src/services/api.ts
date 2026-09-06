@@ -23,6 +23,17 @@ export const apiClient = axios.create({
   },
 });
 
+// Attach JWT token from localStorage if available (essential for cross-domain deployments)
+apiClient.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('preach_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
+});
+
 export const api = {
   auth: {
     async getMe(): Promise<User> {

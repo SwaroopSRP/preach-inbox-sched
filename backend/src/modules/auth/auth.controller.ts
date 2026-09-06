@@ -324,6 +324,20 @@ export async function googleLoginHandler(req: Request, res: Response, next: Next
   }
 }
 
+function getAuthCookieOptions(targetUrl?: string) {
+  const isHttps =
+    Boolean(targetUrl && targetUrl.startsWith('https://')) ||
+    env.FRONTEND_URL.startsWith('https://') ||
+    env.NODE_ENV === 'production';
+
+  return {
+    httpOnly: true,
+    secure: isHttps,
+    sameSite: (isHttps ? 'none' : 'lax') as 'none' | 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  };
+}
+
 export async function googleCallbackHandler(req: Request, res: Response, next: NextFunction) {
   try {
     const code = req.query.code as string;
@@ -341,13 +355,8 @@ export async function googleCallbackHandler(req: Request, res: Response, next: N
     const user = await authService.upsertGoogleUser(profile);
     const token = authService.generateJwtToken(user);
 
-    // Set secure HTTP-only cookie
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+    // Set secure HTTP-only cookie with cross-domain SameSite support
+    res.cookie('token', token, getAuthCookieOptions(targetUrl));
 
     // If client requested json (e.g. in test or programmatic client)
     if (req.headers.accept?.includes('application/json') || req.query.format === 'json') {
@@ -362,6 +371,9 @@ export async function googleCallbackHandler(req: Request, res: Response, next: N
       });
     }
 
+    // Attach token parameter so cross-domain deployments (e.g. Vercel frontend + Render backend) can hydrate localStorage
+    const targetUrlWithToken = `${targetUrl}/?token=${encodeURIComponent(token)}`;
+
     // Render visual login confirmation page before redirecting to frontend dashboard
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.send(
@@ -370,7 +382,7 @@ export async function googleCallbackHandler(req: Request, res: Response, next: N
         email: user.email,
         avatar: user.avatar,
         badgeText: '✓ Google OAuth Verified & Session Cookie Set',
-        targetUrl,
+        targetUrl: targetUrlWithToken,
       })
     );
   } catch (err) {
@@ -393,21 +405,18 @@ export async function devLoginHandler(req: Request, res: Response, next: NextFun
 
     const token = authService.generateJwtToken(user);
 
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    const redirectUrl = (req.query.redirect_url as string) || (req.query.redirect as string);
+    const targetUrl = (redirectUrl && (redirectUrl.startsWith('http://') || redirectUrl.startsWith('https://')))
+      ? redirectUrl.replace(/\/+$/, '')
+      : env.FRONTEND_URL.replace(/\/+$/, '');
+
+    res.cookie('token', token, getAuthCookieOptions(targetUrl));
 
     if (req.headers.accept?.includes('application/json') || req.query.format === 'json') {
       return res.json({ success: true, user, token });
     }
 
-    const redirectUrl = (req.query.redirect_url as string) || (req.query.redirect as string);
-    const targetUrl = (redirectUrl && (redirectUrl.startsWith('http://') || redirectUrl.startsWith('https://')))
-      ? redirectUrl.replace(/\/+$/, '')
-      : env.FRONTEND_URL.replace(/\/+$/, '');
+    const targetUrlWithToken = `${targetUrl}/?token=${encodeURIComponent(token)}`;
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.send(
@@ -416,7 +425,7 @@ export async function devLoginHandler(req: Request, res: Response, next: NextFun
         email,
         avatar,
         badgeText: '✓ Session Active & Token Cookie Set',
-        targetUrl,
+        targetUrl: targetUrlWithToken,
       })
     );
   } catch (err) {
@@ -439,7 +448,12 @@ export async function getCurrentUserHandler(req: Request, res: Response, next: N
 }
 
 export async function logoutHandler(_req: Request, res: Response) {
-  res.clearCookie('token');
+  const cookieOpts = getAuthCookieOptions();
+  res.clearCookie('token', {
+    httpOnly: cookieOpts.httpOnly,
+    secure: cookieOpts.secure,
+    sameSite: cookieOpts.sameSite,
+  });
   res.json({ success: true, message: 'Logged out successfully' });
 }
 
@@ -448,12 +462,7 @@ export async function registerHandler(req: Request, res: Response, next: NextFun
     const validated = registerSchema.parse(req.body);
     const { user, token } = await authService.registerUser(validated);
 
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie('token', token, getAuthCookieOptions());
 
     res.status(201).json({
       message: 'Registration successful',
@@ -470,12 +479,7 @@ export async function loginHandler(req: Request, res: Response, next: NextFuncti
     const validated = loginSchema.parse(req.body);
     const { user, token } = await authService.loginUser(validated);
 
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie('token', token, getAuthCookieOptions());
 
     res.json({
       message: 'Login successful',
