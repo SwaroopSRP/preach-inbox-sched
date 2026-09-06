@@ -32,6 +32,9 @@ export async function getTransporter(): Promise<Transporter> {
         user: env.ETHEREAL_USER,
         pass: env.ETHEREAL_PASSWORD,
       },
+      connectionTimeout: 8000,
+      greetingTimeout: 5000,
+      socketTimeout: 10000,
     });
     logger.info(`Initialized Nodemailer with configured Ethereal credentials (${env.ETHEREAL_USER})`);
     return transporterInstance;
@@ -48,6 +51,9 @@ export async function getTransporter(): Promise<Transporter> {
       user: testAccount.user,
       pass: testAccount.pass,
     },
+    connectionTimeout: 8000,
+    greetingTimeout: 5000,
+    socketTimeout: 10000,
   });
 
   logger.info('Generated Ethereal test account:', {
