@@ -17,12 +17,13 @@ export async function slackCallbackHandler(req: Request, res: Response, next: Ne
     const code = req.query.code as string;
     const stateUserId = (req.query.state as string) || (req.user?.id as string);
 
+    const frontendBase = env.FRONTEND_URL.replace(/\/+$/, '');
     if (!code) {
-      return res.redirect(`${env.FRONTEND_URL}/settings?slack_error=missing_code`);
+      return res.redirect(`${frontendBase}/?slack_error=missing_code`);
     }
 
     await slackService.exchangeSlackCode(code, stateUserId);
-    res.redirect(`${env.FRONTEND_URL}/settings?slack=connected`);
+    res.redirect(`${frontendBase}/?slack=connected`);
   } catch (err) {
     next(err);
   }

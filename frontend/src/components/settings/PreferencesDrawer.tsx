@@ -125,7 +125,7 @@ export const PreferencesDrawer: React.FC<PreferencesDrawerProps> = ({
     }
   };
 
-  const adminQueuesUrl = `${import.meta.env.VITE_API_URL || ''}/admin/queues`;
+  const adminQueuesUrl = api.admin.getQueuesUrl();
 
   return (
     <div

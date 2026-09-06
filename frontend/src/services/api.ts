@@ -9,7 +9,11 @@ import type {
   SlackStatus,
 } from '../types/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+const FRONTEND_URL = (
+  import.meta.env.VITE_FRONTEND_URL ||
+  (typeof window !== 'undefined' ? window.location.origin : '')
+).replace(/\/+$/, '');
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -52,7 +56,24 @@ export const api = {
     },
     getGoogleLoginUrl(): string {
       const base = API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
-      return `${base}/api/auth/google`;
+      const params = new URLSearchParams();
+      if (FRONTEND_URL) {
+        params.set('redirect_url', FRONTEND_URL);
+      }
+      const qs = params.toString();
+      return `${base}/api/auth/google${qs ? `?${qs}` : ''}`;
+    },
+  },
+
+  admin: {
+    getQueuesUrl(): string {
+      const base =
+        API_BASE_URL ||
+        (typeof window !== 'undefined' &&
+        (window.location.port === '5173' || window.location.hostname === 'localhost')
+          ? 'http://localhost:3000'
+          : '');
+      return `${base}/admin/queues`;
     },
   },
 

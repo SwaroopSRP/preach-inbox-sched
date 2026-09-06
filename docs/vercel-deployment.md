@@ -72,10 +72,11 @@ Under **Environment Variables**, add:
 
 | Key | Value | Description |
 | :--- | :--- | :--- |
-| `VITE_API_URL` | `https://preach-inbox-api.onrender.com` | Base URL of your deployed Render backend |
+| `VITE_API_URL` | `https://preach-inbox-api.onrender.com` | Base URL of your deployed Render backend (no trailing slash) |
+| `VITE_FRONTEND_URL` | `https://your-app.vercel.app` | Public URL of your deployed Vercel frontend (used for OAuth returns) |
 
 > [!NOTE]
-> In local development, `VITE_API_URL` can be left empty because the Vite development server automatically proxies `/api` and `/auth` requests directly to `http://localhost:3000`.
+> In local development, `VITE_API_URL` can be left empty because the Vite development server automatically proxies `/api`, `/auth`, and `/admin` requests directly to `http://localhost:3000`.
 
 ### Step 4: Single Page Application (SPA) Routing
 Vercel requires rewrites so that page refreshes on client-side routes route back to `index.html`. This is already pre-configured in `frontend/vercel.json`:

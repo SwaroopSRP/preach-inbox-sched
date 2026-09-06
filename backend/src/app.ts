@@ -35,9 +35,26 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Pro
 export function createApp(): Express {
   const app = express();
 
+  const configuredFrontend = env.FRONTEND_URL.replace(/\/+$/, '');
   app.use(
     cors({
-      origin: env.FRONTEND_URL,
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        const cleanOrigin = origin.replace(/\/+$/, '');
+        if (
+          cleanOrigin === configuredFrontend ||
+          cleanOrigin === 'http://localhost:5173' ||
+          cleanOrigin === 'http://127.0.0.1:5173' ||
+          cleanOrigin === 'http://localhost:3000' ||
+          cleanOrigin === 'http://127.0.0.1:3000'
+        ) {
+          return callback(null, true);
+        }
+        if (configuredFrontend.includes('vercel.app') && cleanOrigin.endsWith('.vercel.app')) {
+          return callback(null, true);
+        }
+        return callback(null, true);
+      },
       credentials: true,
     })
   );
