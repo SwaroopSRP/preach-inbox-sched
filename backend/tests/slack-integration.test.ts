@@ -11,10 +11,10 @@ describe('Slack OAuth & Rate-Limit Notifications', () => {
 
   beforeAll(async () => {
     const user = await prisma.user.upsert({
-      where: { email: 'slack-test@reachinbox.test' },
+      where: { email: 'slack-test@preachinbox.test' },
       update: {},
       create: {
-        email: 'slack-test@reachinbox.test',
+        email: 'slack-test@preachinbox.test',
         name: 'Slack Integration Tester',
       },
     });

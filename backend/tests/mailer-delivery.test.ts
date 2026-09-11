@@ -11,10 +11,10 @@ describe('Email Delivery & Worker State Machine', () => {
 
   beforeAll(async () => {
     const user = await prisma.user.upsert({
-      where: { email: 'delivery-test@reachinbox.test' },
+      where: { email: 'delivery-test@preachinbox.test' },
       update: {},
       create: {
-        email: 'delivery-test@reachinbox.test',
+        email: 'delivery-test@preachinbox.test',
         name: 'Delivery Tester',
       },
     });
@@ -24,13 +24,13 @@ describe('Email Delivery & Worker State Machine', () => {
       where: {
         userId_email: {
           userId: testUserId,
-          email: 'outbox@reachinbox.test',
+          email: 'outbox@preachinbox.test',
         },
       },
       update: {},
       create: {
         userId: testUserId,
-        email: 'outbox@reachinbox.test',
+        email: 'outbox@preachinbox.test',
         name: 'Outbox Sender',
       },
     });

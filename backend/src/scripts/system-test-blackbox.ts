@@ -46,7 +46,7 @@ async function runBlackboxSystemsTest() {
   console.log('===============================================================\n');
 
   const runId = Date.now();
-  const testEmail = `blackbox-${runId}@reachinbox.test`;
+  const testEmail = `blackbox-${runId}@preachinbox.test`;
   const testPassword = 'SecureBlackboxPassword123!';
   const testName = `Blackbox Tester ${runId}`;
 

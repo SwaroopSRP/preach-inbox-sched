@@ -22,7 +22,7 @@ async function runDemo() {
 
   // 1. Authenticate via Dev-Login or Register
   console.log('Step 1: Authenticating test session...');
-  const authRes = await fetch(`${API_URL}/api/auth/dev-login?format=json&email=demo.user@reachinbox.test&name=Demo%20User`);
+  const authRes = await fetch(`${API_URL}/api/auth/dev-login?format=json&email=demo.user@preachinbox.test&name=Demo%20User`);
   const authData = (await authRes.json()) as any;
   const token = authData.token;
   const user = authData.user;

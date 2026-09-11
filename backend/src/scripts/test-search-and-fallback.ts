@@ -11,27 +11,27 @@ async function main() {
 
   // Setup test users
   const userA = await prisma.user.upsert({
-    where: { email: 'elastic-tester-a@reachinbox.test' },
+    where: { email: 'elastic-tester-a@preachinbox.test' },
     update: {},
-    create: { email: 'elastic-tester-a@reachinbox.test', name: 'User A' },
+    create: { email: 'elastic-tester-a@preachinbox.test', name: 'User A' },
   });
 
   const userB = await prisma.user.upsert({
-    where: { email: 'elastic-tester-b@reachinbox.test' },
+    where: { email: 'elastic-tester-b@preachinbox.test' },
     update: {},
-    create: { email: 'elastic-tester-b@reachinbox.test', name: 'User B' },
+    create: { email: 'elastic-tester-b@preachinbox.test', name: 'User B' },
   });
 
   const senderA = await prisma.sender.upsert({
-    where: { userId_email: { userId: userA.id, email: 'sender-a@reachinbox.test' } },
+    where: { userId_email: { userId: userA.id, email: 'sender-a@preachinbox.test' } },
     update: {},
-    create: { userId: userA.id, email: 'sender-a@reachinbox.test', name: 'Sender A' },
+    create: { userId: userA.id, email: 'sender-a@preachinbox.test', name: 'Sender A' },
   });
 
   const senderB = await prisma.sender.upsert({
-    where: { userId_email: { userId: userB.id, email: 'sender-b@reachinbox.test' } },
+    where: { userId_email: { userId: userB.id, email: 'sender-b@preachinbox.test' } },
     update: {},
-    create: { userId: userB.id, email: 'sender-b@reachinbox.test', name: 'Sender B' },
+    create: { userId: userB.id, email: 'sender-b@preachinbox.test', name: 'Sender B' },
   });
 
   // Clean up any leftovers from previous test runs

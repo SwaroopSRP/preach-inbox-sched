@@ -128,7 +128,7 @@ Traditional email schedulers rely on cron loops running periodic queries (e.g. `
 | **Backend** | **Resilient Search Engine** | Multi-match search across recipient, subject, and body via Elasticsearch 9.x with PostgreSQL `ILIKE` fallback. |
 | **Backend** | **Bull Board Admin UI** | Visual queue dashboard mounted at `/admin/queues` showing active, delayed, completed, and failed jobs. |
 | **Backend** | **Ethereal SMTP Sandbox** | Safe test email dispatch via Nodemailer; generates web preview URLs per sent email. |
-| **Frontend** | **Obsidian-Dark UI Design** | Pixel-perfect aesthetic matching ReachInbox Figma specs with custom dark tokens and micro-animations. |
+| **Frontend** | **Obsidian-Dark UI Design** | Pixel-perfect aesthetic featuring modern obsidian dark tokens, dual-pane layouts, glassmorphic modals, and micro-animations. |
 | **Frontend** | **Authentication & Dev Bypass** | Google OAuth login, branded callback screen, Email/Password forms, and 1-click `Dev Login Bypass`. |
 | **Frontend** | **Scheduled Mailbox Feed** | Table of scheduled jobs featuring warm peach badges and live countdowns (e.g. `🕒 Tue 9:15 AM`). |
 | **Frontend** | **Sent Mailbox Feed** | Real-time table of dispatched emails with emerald `✓ Sent` status badges and delivery timestamps. |

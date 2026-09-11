@@ -40,7 +40,7 @@ describe('Google Authentication & Session Management', () => {
   it('retrieves authenticated profile via GET /api/auth/me using JWT token', async () => {
     const testUser = await prisma.user.create({
       data: {
-        email: `jwt-${Date.now()}@reachinbox.test`,
+        email: `jwt-${Date.now()}@preachinbox.test`,
         name: 'JWT Tester',
       },
     });

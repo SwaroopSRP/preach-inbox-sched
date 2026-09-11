@@ -11,10 +11,10 @@ describe('Idempotency & Duplicate Prevention Guard', () => {
 
   beforeAll(async () => {
     const user = await prisma.user.upsert({
-      where: { email: 'idempotency-test@reachinbox.test' },
+      where: { email: 'idempotency-test@preachinbox.test' },
       update: {},
       create: {
-        email: 'idempotency-test@reachinbox.test',
+        email: 'idempotency-test@preachinbox.test',
         name: 'Idempotency Tester',
       },
     });
@@ -24,13 +24,13 @@ describe('Idempotency & Duplicate Prevention Guard', () => {
       where: {
         userId_email: {
           userId: testUserId,
-          email: 'idempotent-sender@reachinbox.test',
+          email: 'idempotent-sender@preachinbox.test',
         },
       },
       update: {},
       create: {
         userId: testUserId,
-        email: 'idempotent-sender@reachinbox.test',
+        email: 'idempotent-sender@preachinbox.test',
         name: 'Idempotent Sender',
       },
     });

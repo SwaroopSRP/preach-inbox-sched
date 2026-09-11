@@ -12,7 +12,7 @@ describe('Elasticsearch Projection & Search API', () => {
   beforeAll(async () => {
     const userA = await prisma.user.create({
       data: {
-        email: `search-a-${Date.now()}@reachinbox.test`,
+        email: `search-a-${Date.now()}@preachinbox.test`,
         name: 'Search User A',
       },
     });
@@ -20,7 +20,7 @@ describe('Elasticsearch Projection & Search API', () => {
 
     const userB = await prisma.user.create({
       data: {
-        email: `search-b-${Date.now()}@reachinbox.test`,
+        email: `search-b-${Date.now()}@preachinbox.test`,
         name: 'Search User B',
       },
     });
@@ -29,7 +29,7 @@ describe('Elasticsearch Projection & Search API', () => {
     const senderA = await prisma.sender.create({
       data: {
         userId: userAId,
-        email: `sender-a-${Date.now()}@reachinbox.test`,
+        email: `sender-a-${Date.now()}@preachinbox.test`,
         name: 'Sender A',
       },
     });
@@ -109,7 +109,7 @@ describe('Elasticsearch Projection & Search API', () => {
         scheduledAt: e3.scheduledAt.toISOString(),
       }),
     ]);
-  });
+  }, 30000);
 
   afterAll(async () => {
     await prisma.email.deleteMany({ where: { userId: { in: [userAId, userBId] } } });

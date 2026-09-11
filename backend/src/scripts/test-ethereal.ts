@@ -3,10 +3,10 @@ import { sendEmail } from '../integrations/mailer/mailer.service.js';
 async function main() {
   console.log('Sending test email via Ethereal SMTP...');
   const result = await sendEmail({
-    fromName: 'ReachInbox Dispatcher',
-    fromEmail: 'outbox@reachinbox.test',
+    fromName: 'PreachInbox Dispatcher',
+    fromEmail: 'outbox@preachinbox.test',
     to: 'lead-candidate@enterprise.com',
-    subject: 'ReachInbox Hiring Assignment - Ethereal Verification',
+    subject: 'PreachInbox Scheduling - Ethereal Verification',
     body: 'This email verifies that the Nodemailer + Ethereal SMTP pipeline is working flawlessly!',
   });
 

@@ -70,7 +70,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       if (!testUser) {
         testUser = await prisma.user.create({
           data: {
-            email: 'test@reachinbox.test',
+            email: 'test@preachinbox.test',
             name: 'Test User',
             googleId: 'test-google-id',
           },

@@ -6,7 +6,7 @@ This document provides a comprehensive engineering guide to the **PreachInbox Sc
 
 ## 1. Overview & Aesthetic System
 
-The PreachInbox frontend is a high-performance, single-page application built to match the ReachInbox Figma specification with an **obsidian-dark aesthetic**, responsive layouts, micro-animations, and complete real-time integration with the backend scheduling engine.
+The PreachInbox frontend is a high-performance, single-page application built with an **obsidian-dark aesthetic**, responsive layouts, micro-animations, and complete real-time integration with the backend scheduling engine.
 
 ### Design Tokens & Aesthetics
 - **Theme Modes**: Full support for Dark (Obsidian default), Light, and System preferences.

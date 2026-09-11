@@ -12,10 +12,10 @@ describe('Email Scheduling & Query APIs', () => {
   beforeAll(async () => {
     // Ensure test user exists
     const user = await prisma.user.upsert({
-      where: { email: 'sched-test@reachinbox.test' },
+      where: { email: 'sched-test@preachinbox.test' },
       update: {},
       create: {
-        email: 'sched-test@reachinbox.test',
+        email: 'sched-test@preachinbox.test',
         name: 'Schedule Tester',
       },
     });
@@ -26,13 +26,13 @@ describe('Email Scheduling & Query APIs', () => {
       where: {
         userId_email: {
           userId: testUserId,
-          email: 'sender@reachinbox.test',
+          email: 'sender@preachinbox.test',
         },
       },
       update: {},
       create: {
         userId: testUserId,
-        email: 'sender@reachinbox.test',
+        email: 'sender@preachinbox.test',
         name: 'Official Sender',
       },
     });

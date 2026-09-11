@@ -13,14 +13,14 @@ import { Job } from 'bullmq';
 describe('Rate Limiting & Throttling Engine', () => {
   let testUserId: string;
   let testSenderId: string;
-  const testSenderEmail = 'limited-sender@reachinbox.test';
+  const testSenderEmail = 'limited-sender@preachinbox.test';
 
   beforeAll(async () => {
     const user = await prisma.user.upsert({
-      where: { email: 'rate-limit-test@reachinbox.test' },
+      where: { email: 'rate-limit-test@preachinbox.test' },
       update: {},
       create: {
-        email: 'rate-limit-test@reachinbox.test',
+        email: 'rate-limit-test@preachinbox.test',
         name: 'Rate Limit Tester',
       },
     });

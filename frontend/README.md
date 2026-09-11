@@ -1,6 +1,6 @@
 # PreachInbox Frontend Dashboard
 
-A production-grade, pixel-perfect email scheduling and outreach dashboard built with **React**, **TypeScript**, **Vite**, and **Tailwind CSS**. Designed to match ReachInbox Figma specifications with an obsidian-dark aesthetic, micro-animations, and full end-to-end integration with the PreachInbox BullMQ backend engine.
+A production-grade, pixel-perfect email scheduling and outreach dashboard built with **React**, **TypeScript**, **Vite**, and **Tailwind CSS**. Designed with an obsidian-dark aesthetic, dual-pane layouts, micro-animations, and full end-to-end integration with the PreachInbox BullMQ backend engine.
 
 ---
 

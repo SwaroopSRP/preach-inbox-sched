@@ -6,10 +6,10 @@ import { emailQueue } from '../queue/email.queue.js';
 async function main() {
   console.log('--- Step 1: Setting up Test User & Sender ---');
   const user = await prisma.user.upsert({
-    where: { email: 'ethereal-demo@reachinbox.test' },
+    where: { email: 'ethereal-demo@preachinbox.test' },
     update: {},
     create: {
-      email: 'ethereal-demo@reachinbox.test',
+      email: 'ethereal-demo@preachinbox.test',
       name: 'Ethereal Demo User',
     },
   });
@@ -18,14 +18,14 @@ async function main() {
     where: {
       userId_email: {
         userId: user.id,
-        email: 'sales@reachinbox.test',
+        email: 'sales@preachinbox.test',
       },
     },
     update: {},
     create: {
       userId: user.id,
-      email: 'sales@reachinbox.test',
-      name: 'ReachInbox Sales Team',
+      email: 'sales@preachinbox.test',
+      name: 'PreachInbox Sales Team',
     },
   });
 
@@ -36,8 +36,8 @@ async function main() {
   const [scheduledEmail] = await scheduleEmails(user.id, {
     senderId: sender.id,
     recipients: ['prospective-client@acme-corp.com'],
-    subject: 'ReachInbox Automated Outreach - Demo Verification',
-    body: 'Hello!\n\nThis is a verified delivery test sent through the BullMQ delayed queue to Ethereal Email.\n\nBest regards,\nReachInbox Team',
+    subject: 'PreachInbox Automated Outreach - Demo Verification',
+    body: 'Hello!\n\nThis is a verified delivery test sent through the BullMQ delayed queue to Ethereal Email.\n\nBest regards,\nPreachInbox Team',
     scheduledAt: new Date(Date.now() + 2000).toISOString(),
     delayMs: 2000,
   });

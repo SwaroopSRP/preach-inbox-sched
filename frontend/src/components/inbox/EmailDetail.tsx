@@ -43,7 +43,7 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
   })();
 
   const senderName = email.sender?.name || email.sender?.email?.split('@')[0] || 'Sender';
-  const senderEmail = email.sender?.email || 'noreply@reachinbox.ai';
+  const senderEmail = email.sender?.email || 'noreply@preachinbox.ai';
   const initial = (senderName || 'S').charAt(0).toUpperCase();
 
   const isHtml = email.body.includes('<') && email.body.includes('>');
